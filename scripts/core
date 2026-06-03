@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+# Canonical skill-invocation surface. Sources lib/wrapper.sh (which
+# bootstraps the per-platform binary on first call AND owns the
+# authoritative-gated CLAUDE_PLUGIN_DATA -> CORE_DATA_DIR translation the
+# Go CLI's path-resolution layer (internal/db.ResolveRoot) reads), then
+# execs the binary. This shim only captures ANTON_DATA_DIR_AUTHORITATIVE
+# (before the CLAUDE_PLUGIN_DATA := default masks it) so wrapper.sh can
+# tell a Claude-Code-provided data root from an operator-shell default.
+# Hooks source lib/wrapper.sh directly; this is the equivalent entry
+# point for everything skills invoke -- plus ad-hoc operator-shell use
+# via the ~/.local/bin/core symlink that /anton-core:setup creates.
+#
+# Symlink-safe: resolves $0 via readlink so $CLAUDE_PLUGIN_ROOT
+# derives correctly when invoked through the operator-shell symlink
+# (otherwise dirname "$0" would point at ~/.local/bin/).
+set -euo pipefail
+
+# Resolve self to absolute path even when invoked via a symlink.
+# macOS lacks `readlink -f`; loop manually for portability. POSIX SYMLOOP_MAX
+# is 8; 40 hops gives headroom for nested workspace symlinks while killing
+# cyclic-symlink hangs (e.g. `a -> b, b -> a`) in well under a second.
+# macOS readlink itself does not detect cycles, so the cap is load-bearing.
+_script_path="$0"
+_link_hops=0
+while [[ -L "$_script_path" ]]; do
+    _link_hops=$((_link_hops + 1))
+    if [[ $_link_hops -gt 40 ]]; then
+        printf '{"status":"error","error":{"kind":"precondition_missing","reason":"symlink_loop","detail":"more than 40 symlink hops resolving %s — refusing to continue; check %s and ancestors for a cyclic symlink"}}\n' \
+            "$0" "$0" >&2
+        exit 2
+    fi
+    if ! _readlink_out="$(readlink "$_script_path" 2>&1)"; then
+        # readlink can fail for reasons distinct from cyclic-link (broken
+        # target with EPERM on the link, ACL denying read, race with an
+        # unlink between -L test and readlink). set -e would otherwise
+        # abort silently here; emit the skill-shape envelope so the
+        # operator sees the actual cause instead of exit 1 with no stderr.
+        _readlink_msg="$(printf '%s' "$_readlink_out" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+        printf '{"status":"error","error":{"kind":"precondition_missing","reason":"readlink_failed","detail":"readlink failed on %s: %s; check link permissions and target existence"}}\n' \
+            "$_script_path" "${_readlink_msg:-<no stderr>}" >&2
+        exit 2
+    fi
+    _target="$_readlink_out"
+    case "$_target" in
+        /*) _script_path="$_target" ;;
+        *)  _script_path="$(cd "$(dirname "$_script_path")" && cd "$(dirname "$_target")" && pwd)/$(basename "$_target")" ;;
+    esac
+done
+_script_dir="$(cd "$(dirname "$_script_path")" && pwd)"
+
+# Capture authoritativeness before the := default below masks it. Explicit
+# yes/no sentinel (NOT :=) so the value survives re-evaluation in the sourced
+# wrapper.sh: operator-shell (no CLAUDE_PLUGIN_DATA) writes a non-empty "no",
+# which wrapper.sh's presence test leaves as-is, so CORE_DATA_DIR is NOT pinned
+# and the Go resolver falls through to ~/.anton-core/config.json. Exported so
+# the sourced wrapper.sh honors it. Must run BEFORE the := default below.
+if [ -z "${ANTON_DATA_DIR_AUTHORITATIVE+x}" ]; then
+    if [ -n "${CLAUDE_PLUGIN_DATA+x}" ]; then
+        ANTON_DATA_DIR_AUTHORITATIVE=yes
+    else
+        ANTON_DATA_DIR_AUTHORITATIVE=no
+    fi
+fi
+export ANTON_DATA_DIR_AUTHORITATIVE
+
+# Derive PLUGIN_ROOT from the resolved shim path; default PLUGIN_DATA
+# to PLUGIN_ROOT (matches the CLAUDE_PLUGIN_DATA fallback in
+# scripts/lib/wrapper.sh). Both are := defaults — any caller that
+# pre-sets these wins (Claude Code at skill invocation, the harness
+# in tests, the operator at the shell).
+: "${CLAUDE_PLUGIN_ROOT:=$(cd "$_script_dir/.." && pwd)}"
+: "${CLAUDE_PLUGIN_DATA:=$CLAUDE_PLUGIN_ROOT}"
+export CLAUDE_PLUGIN_ROOT CLAUDE_PLUGIN_DATA
+
+# --wrapper-check: operator probe. Resolves and prints the paths
+# without invoking the binary or triggering bootstrap. JSON via jq
+# when available; sed-escape fallback otherwise so the diagnostic
+# survives paths containing backslashes or doublequotes.
+if [[ "${1:-}" == "--wrapper-check" ]]; then
+    version="$(grep -E '"version"' "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null \
+        | head -1 \
+        | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+        || true)"
+    # Empty version means plugin.json was unreadable, malformed, or missing
+    # the field. The naive path would emit an envelope with bin_path ending
+    # in a trailing dash and bin_exists=false — a clean-looking diagnostic
+    # pointing at a phantom binary. Hard-fail instead so operators running
+    # --wrapper-check to diagnose breakage get an actionable error.
+    if [[ -z "$version" ]]; then
+        printf '{"status":"error","error":{"kind":"precondition_missing","reason":"missing_manifest_version","detail":"could not read .version from %s/.claude-plugin/plugin.json (missing, unreadable, or malformed); re-install the plugin or run /anton-core:setup"}}\n' \
+            "$CLAUDE_PLUGIN_ROOT" >&2
+        exit 2
+    fi
+    bin_path="$CLAUDE_PLUGIN_DATA/data/bin/anton-core-v${version}"
+    if [[ -x "$bin_path" ]]; then
+        bin_exists=true
+    else
+        bin_exists=false
+    fi
+    # Dev shortcut: when a contributor runs `make build`, the binary
+    # lands at $CLAUDE_PLUGIN_ROOT/bin/anton-core and wrapper.sh's
+    # dev-shortcut branch prefers it over the versioned cache. Surface
+    # both candidates so an operator running --wrapper-check to diagnose
+    # breakage in dev mode doesn't see a misleading bin_exists=false
+    # while the live invocation path is happily using the dev binary.
+    dev_bin="$CLAUDE_PLUGIN_ROOT/bin/anton-core"
+    if [[ -x "$dev_bin" ]]; then
+        dev_bin_exists=true
+    else
+        dev_bin_exists=false
+    fi
+    # Parse-check the sourced wrapper without sourcing it. Without this
+    # field a bash 4-only construct in wrapper.sh produces a clean
+    # --wrapper-check envelope (since the diagnostic exits before the
+    # source line) while the next `core <verb>` invocation explodes.
+    # Prefer /bin/bash on macOS so the strict bash-3.2 target is checked.
+    if [[ -x /bin/bash ]]; then
+        _wrapper_parse_bash=/bin/bash
+    else
+        _wrapper_parse_bash=bash
+    fi
+    if "$_wrapper_parse_bash" -n "$_script_dir/lib/wrapper.sh" 2>/dev/null; then
+        wrapper_parses=true
+    else
+        wrapper_parses=false
+    fi
+    # Reject control bytes in any field destined for the JSON envelope. The
+    # sed fallback only escapes `\` and `"`; a literal newline/tab/\x01–\x1f
+    # in $CLAUDE_PLUGIN_ROOT, $CLAUDE_PLUGIN_DATA, or $version (legal in
+    # POSIX paths) would silently produce invalid JSON. Hard-reject so the
+    # diagnostic never lies about its own output.
+    case "$CLAUDE_PLUGIN_ROOT$CLAUDE_PLUGIN_DATA$bin_path$dev_bin$version" in
+        *[[:cntrl:]]*)
+            printf '{"status":"error","error":{"kind":"precondition_missing","reason":"control_byte_in_path","detail":"resolved path or version contains a control byte (newline/tab/etc); refusing to emit corrupt JSON. Check CLAUDE_PLUGIN_ROOT and CLAUDE_PLUGIN_DATA."}}\n' >&2
+            exit 2
+            ;;
+    esac
+    if command -v jq >/dev/null 2>&1; then
+        jq -nc \
+            --arg pr  "$CLAUDE_PLUGIN_ROOT" \
+            --arg pd  "$CLAUDE_PLUGIN_DATA" \
+            --arg v   "$version" \
+            --arg bp  "$bin_path" \
+            --argjson be "$bin_exists" \
+            --arg db  "$dev_bin" \
+            --argjson dbe "$dev_bin_exists" \
+            --argjson wp "$wrapper_parses" \
+            '{plugin_root:$pr, plugin_data:$pd, data_root:$pd, version:$v, bin:$bp, bin_exists:$be, dev_bin:$db, dev_bin_exists:$dbe, wrapper_parses:$wp}'
+    else
+        _esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
+        printf '{"plugin_root":"%s","plugin_data":"%s","data_root":"%s","version":"%s","bin":"%s","bin_exists":%s,"dev_bin":"%s","dev_bin_exists":%s,"wrapper_parses":%s}\n' \
+            "$(_esc "$CLAUDE_PLUGIN_ROOT")" \
+            "$(_esc "$CLAUDE_PLUGIN_DATA")" \
+            "$(_esc "$CLAUDE_PLUGIN_DATA")" \
+            "$(_esc "$version")" \
+            "$(_esc "$bin_path")" \
+            "$bin_exists" \
+            "$(_esc "$dev_bin")" \
+            "$dev_bin_exists" \
+            "$wrapper_parses"
+    fi
+    exit 0
+fi
+
+# The CLAUDE_PLUGIN_DATA -> CORE_DATA_DIR translation now lives in
+# scripts/lib/wrapper.sh (sourced below), gated on
+# ANTON_DATA_DIR_AUTHORITATIVE captured above. Operator-shell invocations
+# (no CLAUDE_PLUGIN_DATA) are non-authoritative, so wrapper.sh leaves
+# CORE_DATA_DIR unset and the Go resolver falls through to
+# ~/.anton-core/config.json instead of pinning the rotating cache.
+
+# Defer the hook-shape "exit 0 with envelope on stdout" path inside
+# wrapper.sh so the shim can re-emit a skill-shape error on stderr
+# with a non-zero exit (see post-source block below).
+ANTON_DEFER_BOOTSTRAP_ERROR=1
+export ANTON_DEFER_BOOTSTRAP_ERROR
+
+# Guard the source call itself. A parse error in lib/wrapper.sh, a
+# missing file, or any pre-source-completion `set -e` abort would
+# otherwise bypass the post-source envelope below and leak raw bash
+# diagnostics to stderr -- regressing the very contract this shim
+# exists to enforce (skill-shape JSON or nothing). Catch the failure
+# here and emit a wrapper_source_failed envelope.
+_wrapper_src_err="$(mktemp "${TMPDIR:-/tmp}/anton-shim-src.XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/anton-shim-src.$$.err")"
+# shellcheck source=lib/wrapper.sh disable=SC1091
+if ! source "$_script_dir/lib/wrapper.sh" 2>"$_wrapper_src_err"; then
+    _src_status=$?
+    _src_msg=""
+    if [[ -s "$_wrapper_src_err" ]]; then
+        _src_msg="$(head -1 "$_wrapper_src_err" 2>/dev/null || true)"
+    fi
+    rm -f "$_wrapper_src_err"
+    _src_msg_esc="$(printf '%s' "${_src_msg:-<no stderr>}" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+    printf '{"status":"error","error":{"kind":"precondition_missing","reason":"wrapper_source_failed","detail":"failed to source scripts/lib/wrapper.sh (exit %s): %s; run scripts/core --wrapper-check for path diagnostics"}}\n' \
+        "$_src_status" "$_src_msg_esc" >&2
+    exit 2
+fi
+rm -f "$_wrapper_src_err"
+
+# Surface bootstrap failure as a skill-shape envelope on stderr +
+# non-zero exit. wrapper.sh writes a hook-shape precondition envelope
+# to stdout and exits 0 (non-blocking hooks contract). Skills cannot
+# consume that shape on stdout -- they would treat it as data. The
+# shim intercepts the failure here and re-emits a skill-shape error,
+# then exits 2 so callers (skill bodies, operator shells) get a real
+# non-zero status.
+if [[ -n "${BOOTSTRAP_FAIL_REASON:-}" ]]; then
+    printf '{"status":"error","error":{"kind":"precondition_missing","reason":"%s","detail":"anton-core binary unavailable; run /anton-core:setup or check network connectivity"}}\n' \
+        "$BOOTSTRAP_FAIL_REASON" >&2
+    exit 2
+fi
+
+exec "$ANTON_BIN" "$@"

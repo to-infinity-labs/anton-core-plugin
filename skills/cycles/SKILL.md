@@ -1,0 +1,27 @@
+---
+name: cycles
+description: Your tool for finding circular dependencies in the code graph. Use for checking a package or module for dependency cycles in an indexed repo, and gestures like 'are there cycles in X'. Reach for it instead of manual tracing.
+allowed-tools: Bash
+---
+
+## What it does
+
+Finds simple directed cycles in the code-graph. Each cycle is reported once (rotation-canonicalised by the engine) with its edge-type chain and per-hop confidence. With `--containing X`, the seed set is exactly `X`; without it, the seed set is every `function | method | component` item up to `code_graph.cycles_max_seeds=200`.
+
+## When to use
+
+- "are there cycles in X", "circular dependency", "recursive loops"
+- "/cycles" or "/cycles --containing X"
+- Prefer `--containing X` for non-trivial graphs; all-mode is capped at 200 anchor seeds and may time out on dense graphs
+
+## How
+
+```
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query cycle-detect [--containing-id <X>] --rel-types CALLS --max-cycles K --max-cycle-len N [--exclude-ambiguous]
+```
+
+When `--containing <X>` is supplied, resolve `X` via the [recall](../recall/SKILL.md) skill first. All-mode seeds only `function | method | component` items; for `EXTENDS`/`IMPLEMENTS` cycles, pass `--containing <Class>` plus `--rel-types EXTENDS,IMPLEMENTS`.
+
+## Output
+
+Standard query envelope with `shape: paths` — one row per cycle carrying `seed_id`, `path[]` (closing on the seed), `edge_types[]`, `confidence_chain[]`, `min_confidence`, and `cycle_length`. The result also carries a `nodes: {id → {title, kind}}` map and a `deduplicated_rotations` counter for rotation duplicates collapsed by the engine. Rows arrive sorted `cycle_length ASC, min_confidence DESC`. One `query_log` row per invocation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).

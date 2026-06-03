@@ -1,0 +1,27 @@
+---
+name: bulk-import
+description: Batch-import a directory of files into the knowledge base, resuming from a checkpoint on interruption. Use for "bulk import this folder", "import this directory", or "ingest this directory".
+allowed-tools: Bash
+---
+
+## What it does
+
+Walks a directory, classifies each file, and routes every file through the same intake pipeline as `save`. Updates a checkpoint after each success so an interrupted run resumes without redoing completed files. Two paths share one dispatcher: in-session orchestration with batched concurrency, and an out-of-session CLI executor for unattended runs.
+
+## When to use
+
+- "bulk import this folder", "import this directory", "ingest this directory"
+- `/anton-core:bulk-import` against a known content tree
+- Backfilling a fresh database from an existing knowledge folder
+
+## How
+
+```
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" item bulk-import --path <dir> [--recursive] [--dry-run] [--format jsonl|summary] [--quiet]
+```
+
+Use `--dry-run` first to preview the file count and classification before any write. Re-running against the same directory detects the checkpoint and skips completed files.
+
+## Output
+
+Success envelope reports `imported`, `by_type`, `tasks_created`, `relationships`, `dropped_by_owner_filter`, `stub_documents_written`, `errors`, `skipped`, and per-stage `timing_ms`. Streaming mode emits one JSONL line per file plus a final `{"summary": true, ...}` line. Contract: [docs/plugin-spec/05-cli-contract.md#item-bulk-import](../../docs/plugin-spec/05-cli-contract.md#item-bulk-import).

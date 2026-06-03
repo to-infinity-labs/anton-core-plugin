@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "anton-core",
+  "version": "1.5.0",
+  "description": "Personal AI assistant — knowledge, tasks, code graph, session intelligence",
+  "owner": {
+    "name": "xlightxyearx",
+    "url": "https://github.com/xlightxyearx/anton-core-plugin"
+  },
+  "plugins": [
+    {
+      "name": "anton-core",
+      "version": "1.5.0",
+      "description": "Personal AI assistant — knowledge, tasks, code graph, session intelligence",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

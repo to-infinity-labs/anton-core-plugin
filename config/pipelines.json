@@ -1,0 +1,30 @@
+{
+  "pipelines": [
+    {
+      "name": "transcript",
+      "match": { "content_kind": "transcript" },
+      "stages": ["format", "extract", "reconcile", "write"]
+    },
+    {
+      "name": "code",
+      "match": { "content_kind": "code" },
+      "stages": ["format", "extract", "reconcile", "write"]
+    },
+    {
+      "name": "document",
+      "match": { "content_kind": "document" },
+      "stages": ["format", "extract", "reconcile", "write"]
+    },
+    {
+      "name": "note",
+      "match": { "content_kind": "note" },
+      "stages": ["reconcile", "write"]
+    },
+    {
+      "name": "default",
+      "match": { "content_kind": "*" },
+      "stages": ["format", "extract", "reconcile", "write"]
+    }
+  ],
+  "embedding_model": "text-embedding-3-small"
+}

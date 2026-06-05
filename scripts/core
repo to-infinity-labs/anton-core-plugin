@@ -7,12 +7,15 @@
 # (before the CLAUDE_PLUGIN_DATA := default masks it) so wrapper.sh can
 # tell a Claude-Code-provided data root from an operator-shell default.
 # Hooks source lib/wrapper.sh directly; this is the equivalent entry
-# point for everything skills invoke -- plus ad-hoc operator-shell use
-# via the ~/.local/bin/core symlink that /anton-core:setup creates.
+# point for everything skills invoke. Ad-hoc operator-shell use does NOT
+# come through here: /anton-core:setup installs a separate minimal launcher
+# (scripts/core-shim.sh -> <data>/data/bin/core) that the ~/.local/bin/core
+# symlink points at, so a bare-shell `core` execs the live
+# data/versions/current pointer instead of this version-pinned shim.
 #
-# Symlink-safe: resolves $0 via readlink so $CLAUDE_PLUGIN_ROOT
-# derives correctly when invoked through the operator-shell symlink
-# (otherwise dirname "$0" would point at ~/.local/bin/).
+# Symlink-safe: resolves $0 via readlink so $CLAUDE_PLUGIN_ROOT derives
+# correctly even if this shim is itself reached through a symlink (dev
+# checkouts, test harnesses) -- otherwise dirname "$0" could misresolve.
 set -euo pipefail
 
 # Resolve self to absolute path even when invoked via a symlink.

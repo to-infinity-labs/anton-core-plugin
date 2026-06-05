@@ -6,7 +6,7 @@ allowed-tools: Read, Edit, Bash, AskUserQuestion
 
 ## What it does
 
-End-to-end first-run installer for the plugin. Initializes `core.db` + `events.db` (schema + DEFAULT_CONFIG seed), merges the plugin-shipped fragment into `~/.claude/CLAUDE.md`, optionally creates a `~/.local/bin/core` symlink so the operator's shell can invoke the binary directly, and pins the `fragment.version` so subsequent runs idempotently detect the no-op fast path. Every binary invocation routes through `${CLAUDE_PLUGIN_ROOT}/scripts/core`, which auto-fetches the per-platform artifact on first call (see [ADR-0032](../../docs/adr/0032-marketplace-binary-distribution.md)).
+End-to-end first-run installer for the plugin. Initializes `core.db` + `events.db` (schema + DEFAULT_CONFIG seed), merges the plugin-shipped fragment into `~/.claude/CLAUDE.md`, optionally installs an operator-shell launcher (`~/.local/bin/core` → `${CLAUDE_PLUGIN_DATA}/data/bin/core`) that execs the live self-update binary so a bare-shell `core` never goes stale after a `/plugin update`, and pins the `fragment.version` so subsequent runs idempotently detect the no-op fast path. Every binary invocation routes through `${CLAUDE_PLUGIN_ROOT}/scripts/core`, which auto-fetches the per-platform artifact on first call (see [ADR-0032](../../docs/adr/0032-marketplace-binary-distribution.md)).
 
 ## When to use
 
@@ -54,10 +54,16 @@ The exported `ANTON_GITHUB_TOKEN` lives only for this skill run — subsequent s
 
 4. Scan for the sentinel pair `<!-- anton-core:start -->` and `<!-- anton-core:end -->`. **If present**, use `Edit` to replace the byte range between (and including) those markers with the new fragment body, keeping the sentinels intact. **If absent**, use `Edit` to append the fragment body bracketed by a fresh sentinel pair to EOF.
 
-5. **Shell-PATH symlink (optional).** Create or refresh `${HOME}/.local/bin/core` → `${CLAUDE_PLUGIN_ROOT}/scripts/core` so the operator can invoke bare `core <verb>` at the shell. `mkdir -p "$HOME/.local/bin"`; on mkdir failure emit a one-line stderr warning naming the directory and the errno, then skip this step (the symlink is convenience, not a hard requirement). At the symlink site:
+5. **Operator-shell launcher (optional).** Install the data-dir launcher and point the `~/.local/bin/core` PATH symlink at it, so a bare-shell `core <verb>` always execs the live self-update binary (`data/versions/current`) rather than the version-pinned plugin cache that `/plugin update` rotates. Three ordered sub-steps; the whole step is convenience, not a hard requirement.
+
+   **5a. Materialize `current`.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/core" update status >/dev/null 2>&1`. This verb is read-only (no network) but constructs the update orchestrator, which runs the one-shot legacy→versioned migration: it moves the first-install binary from `data/bin/anton-core-v${VERSION}` into `data/versions/v${VERSION}/anton-core`, writes the `installed-version` pin, and creates the `data/versions/current` symlink the launcher execs. A non-zero exit is a non-fatal warning (the launcher guards a missing `current`). Then confirm `[ -L "${CLAUDE_PLUGIN_DATA}/data/versions/current" ]`; if absent, emit a one-line stderr warning and continue.
+
+   **5b. Install the launcher.** `mkdir -p "${CLAUDE_PLUGIN_DATA}/data/bin"`. When `${CLAUDE_PLUGIN_DATA}/data/bin/core` is absent or differs (`! cmp -s "${CLAUDE_PLUGIN_ROOT}/scripts/core-shim.sh" "${CLAUDE_PLUGIN_DATA}/data/bin/core"`), copy the shipped `scripts/core-shim.sh` into place and `chmod +x` it. Idempotent — a byte-identical launcher is left untouched. On `mkdir`/`cp` failure emit a one-line stderr warning and skip the rest of Step 5.
+
+   **5c. PATH symlink.** Create or refresh `${HOME}/.local/bin/core` → `${CLAUDE_PLUGIN_DATA}/data/bin/core`. `mkdir -p "$HOME/.local/bin"`; on mkdir failure emit a one-line stderr warning naming the directory and the errno, then skip (the symlink is convenience). At the symlink site:
    - Site absent → create the symlink.
-   - Site is a symlink AND `readlink` matches `${CLAUDE_PLUGIN_ROOT}/scripts/core` byte-for-byte → no-op.
-   - Site is any symlink to anything else (different version, different path, dangling target) → overwrite via `ln -sfn`.
+   - Site is a symlink AND `readlink` matches `${CLAUDE_PLUGIN_DATA}/data/bin/core` byte-for-byte → no-op.
+   - Site is any symlink to anything else (the legacy `${CLAUDE_PLUGIN_ROOT}/scripts/core` target from a pre-launcher install, a different path, a dangling target) → overwrite via `ln -sfn` — this auto-migrates an existing install onto the launcher.
    - Site exists but is NOT a symlink (regular file, dir, device) → refuse to clobber; emit a stderr warning naming the file; setup continues.
 
    If `$HOME/.local/bin` is not on `$PATH`, emit a one-line stderr notice with the shell-RC line to add (e.g., `export PATH="$HOME/.local/bin:$PATH"`). Do NOT modify the operator's shell-RC.
@@ -80,7 +86,7 @@ The skill never shells `sed` or `awk` — `Edit` is the only file mutator, and e
 
 ## Behavior
 
-After a successful run, `core.db` and `events.db` exist at `${CLAUDE_PLUGIN_DATA}/data/`, fully schema'd and seeded; `~/.claude/CLAUDE.md` contains the fragment body bracketed by the `<!-- anton-core:start -->`/`<!-- anton-core:end -->` sentinel pair; `~/.local/bin/core` (when creation succeeded) is a symlink to `${CLAUDE_PLUGIN_ROOT}/scripts/core`; `"${CLAUDE_PLUGIN_ROOT}/scripts/core" config get --key fragment.version` returns the fragment's frontmatter version. Re-running over an up-to-date install rewrites the same bytes and re-pins the same version — no diff, no surprise. Spec: [docs/plugin-spec/07-skills/setup.md](../../docs/plugin-spec/07-skills/setup.md).
+After a successful run, `core.db` and `events.db` exist at `${CLAUDE_PLUGIN_DATA}/data/`, fully schema'd and seeded; `~/.claude/CLAUDE.md` contains the fragment body bracketed by the `<!-- anton-core:start -->`/`<!-- anton-core:end -->` sentinel pair; `~/.local/bin/core` (when creation succeeded) is a symlink to the operator-shell launcher at `${CLAUDE_PLUGIN_DATA}/data/bin/core`, which execs `data/versions/current`; `"${CLAUDE_PLUGIN_ROOT}/scripts/core" config get --key fragment.version` returns the fragment's frontmatter version. Re-running over an up-to-date install rewrites the same bytes and re-pins the same version — no diff, no surprise. Spec: [docs/plugin-spec/07-skills/setup.md](../../docs/plugin-spec/07-skills/setup.md).
 
 ## Uninstall
 
@@ -90,13 +96,13 @@ When `--uninstall` is present in the operator's args:
 
 2. **Confirm.** Render a single `AskUserQuestion` block listing each `removed[*]` path with its `bytes` (humanized) and `kind`, plus three callouts:
    - the CLAUDE.md fragment between `<!-- anton-core:start -->` / `<!-- anton-core:end -->` will be wiped (sentinel region is plugin-managed; operator hand-edits inside the markers go with it);
-   - the `~/.local/bin/core` symlink will be removed only when its target resolves to `${CLAUDE_PLUGIN_ROOT}/scripts/core`;
+   - the `~/.local/bin/core` symlink will be removed only when its target resolves to the launcher at `${CLAUDE_PLUGIN_DATA}/data/bin/core`;
    - when `--purge-data` is set, a destructive callout: "This permanently erases your operator content. There is no undo."
    Options: "Yes, uninstall" / "Cancel". Cancel exits cleanly with zero filesystem mutation.
 
 3. **Execute (on Yes):**
    a. Run `"${CLAUDE_PLUGIN_ROOT}/scripts/core" setup uninstall [--purge-data] --format json`. The verb acquires `<CLAUDE_PLUGIN_DATA>/data/bin/.bootstrap.lock` before the first removal — same derivation as `scripts/lib/wrapper.sh`, so a concurrent bash bootstrap cannot race the removal. Surface any non-zero envelope verbatim.
    b. `Read` `~/.claude/CLAUDE.md`. If sentinels are present, use `Edit` to delete the marker pair + body. No-op if sentinels are absent.
-   c. Bash: `readlink ~/.local/bin/core 2>/dev/null`. If the resolved target equals `${CLAUDE_PLUGIN_ROOT}/scripts/core`, `rm -f ~/.local/bin/core`. Otherwise emit a one-line stderr warning ("not an anton-core symlink, leaving in place") and continue.
+   c. Bash: `readlink ~/.local/bin/core 2>/dev/null`. If the resolved target equals `${CLAUDE_PLUGIN_DATA}/data/bin/core` (the launcher), `rm -f ~/.local/bin/core`. Otherwise emit a one-line stderr warning ("not the launcher symlink, leaving in place") and continue. (Step 3a's `setup uninstall` verb already wiped `${CLAUDE_PLUGIN_DATA}` wholesale — taking the launcher copy at `data/bin/core` with it — so this step removes only the home-dir symlink.)
 
 4. **Summary.** Print the resolved paths removed, bytes freed (sum of `removed[*].bytes`), the reminder to run `/plugin uninstall anton-core` separately to complete plugin removal, and the explicit callout that per-project memory under `~/.claude/projects/.../memory/` is untouched. Also note: a subsequent fresh install will be treated as first-run (the welcome flag was in the now-wiped config table).

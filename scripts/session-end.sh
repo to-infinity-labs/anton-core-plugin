@@ -7,6 +7,9 @@ _extract_session_id
 if [[ -n "$SESSION_ID" ]]; then
     set -- --session-id "$SESSION_ID" "$@"
 fi
+if [[ -n "$TRANSCRIPT_PATH" ]]; then
+    set -- --transcript-path "$TRANSCRIPT_PATH" "$@"
+fi
 
 # Background prefetch; never blocks SessionEnd. Stderr is tee'd to a data-dir
 # log (mirroring session-start.sh) so a silent prefetch failure — asset

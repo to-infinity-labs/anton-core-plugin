@@ -4,6 +4,7 @@
     "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-end.sh" }] }],
     "PreCompact":       [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh" }] }],
     "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/prompt-submit.sh" }] }],
-    "PostToolUse":      [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use.sh" }] }]
+    "PostToolUse":      [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use.sh" }] }],
+    "PostToolUseFailure": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use-failure.sh" }] }]
   }
 }

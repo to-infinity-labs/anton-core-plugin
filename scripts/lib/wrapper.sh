@@ -539,16 +539,20 @@ fi
 
 # Helper used by SessionEnd and PreCompact wrappers. Sets SESSION_ID from
 # Claude Code's stdin JSON payload (docs/plugin-spec/08-hooks.md) for
-# injection as --session-id. Production path: stdin is piped, jq is
-# present, payload has session_id. TTY runs (manual invocation, tests) or
-# missing jq fall through with SESSION_ID empty; the Go verb logs the skip.
+# injection as --session-id, and sets TRANSCRIPT_PATH from .transcript_path
+# for --transcript-path injection (fail→success pattern mining). Production
+# path: stdin is piped, jq is present, payload has session_id. TTY runs
+# (manual invocation, tests) or missing jq fall through with SESSION_ID and
+# TRANSCRIPT_PATH empty; the Go verb logs the skip.
 #
-# SESSION_ID is a global the calling wrapper reads after invocation —
-# the static linter cannot see the cross-file usage, so the SC2034
-# disable below pins the contract instead of marking the var unused.
+# SESSION_ID and TRANSCRIPT_PATH are globals the calling wrapper reads after
+# invocation — the static linter cannot see the cross-file usage, so the
+# SC2034 disables below pin the contract instead of marking the vars unused.
 _extract_session_id() {
     # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
     SESSION_ID=""
+    # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
+    TRANSCRIPT_PATH=""
     if [[ -t 0 ]] || ! command -v jq >/dev/null 2>&1; then
         return 0
     fi
@@ -565,4 +569,6 @@ _extract_session_id() {
     # and logs the skip per the non-blocking-hooks contract.
     # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
     SESSION_ID=$(printf '%s' "$payload" | jq -r '.session_id // empty' || true)
+    # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
+    TRANSCRIPT_PATH=$(printf '%s' "$payload" | jq -r '.transcript_path // empty' || true)
 }

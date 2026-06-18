@@ -18,7 +18,7 @@ State-aware installer and lifecycle surface for anton-core. On invocation it run
 ## Conventions (apply throughout)
 
 - Every binary call routes through `"${CLAUDE_PLUGIN_ROOT}/scripts/core" <verb>`. Never invoke a bare `core` from this body.
-- `Edit` is the only mutator for `~/.claude/CLAUDE.md`; never `sed`/`awk`. Every step is a no-op when its precondition already holds.
+- `core fragment apply` is the only mutator for the `~/.claude/CLAUDE.md` *fragment*; the install/update/repair flow never edits it directly. Every step is a no-op when its precondition already holds.
 - Operator prompts use `AskUserQuestion` (never stdin).
 - Voice: neutral, warm, concise — no persona.
 
@@ -48,7 +48,7 @@ Then route:
 Gather, without writing anything. **Read-only guard:** every `"${CLAUDE_PLUGIN_ROOT}/scripts/core" <verb>` other than `db` / `--help` / `--version` opens — and therefore *creates and schemas* — `core.db` + `events.db` on first contact (the binary auto-constructs the data layer for any DB-backed verb). So the probe makes **no binary call when `core.db` is absent**: every binary-backed signal below is gated on the Step 1.1 `core.db`-existence boolean and falls back to its fresh-box default. Classification needs only the file-existence and `Read` signals, which never touch the binary.
 
 1. **DB presence:** `[ -f "${CLAUDE_PLUGIN_DATA}/data/core.db" ]` and the same for `events.db`. Capture both as booleans; the `core.db` boolean gates every binary call below.
-2. **Fragment + pin:** `Read ~/.claude/CLAUDE.md` (a `Read`, never a binary call); detect the `<!-- anton-core:start -->` / `<!-- anton-core:end -->` sentinels. Pinned version — **only when `core.db` exists** — `"${CLAUDE_PLUGIN_ROOT}/scripts/core" config get --key fragment.version` (value is `null` when unset); when `core.db` is absent, treat the pin as `null` and skip the call.
+2. **Fragment + pin:** When `core.db` exists, run `"${CLAUDE_PLUGIN_ROOT}/scripts/core" fragment status` and read `on_disk_version`, `pinned_version`, `dest_has_sentinels`, and `drift` from the envelope. When `core.db` is absent, skip the call and treat all four as their fresh-box defaults (`on_disk_version` null, `pinned_version` null, `dest_has_sentinels` false, `drift` "unknown"). The classifier maps `drift == "newer"` directly to the `update-available` classification.
 3. **Shipped fragment version:** `Read ${CLAUDE_PLUGIN_ROOT}/claude-md-fragment.md` frontmatter `fragment-version`.
 4. **Plugin version (display only):** `Read ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` `.version`.
 5. **Symlink state:** `readlink ~/.local/bin/core` → classify correct / legacy / dangling / collision / absent.
@@ -99,10 +99,7 @@ d. **Deferred classification telemetry (fresh only).** When the probe classified
 
 Print `2/4 Connect to Claude`.
 
-a. `Read` `${CLAUDE_PLUGIN_ROOT}/claude-md-fragment.md` (frontmatter carries `fragment-version`).
-b. `Read` `~/.claude/CLAUDE.md` (treat absence as empty).
-c. Sentinels present → `Edit` to replace the byte range between (and including) `<!-- anton-core:start -->` / `<!-- anton-core:end -->` with the new fragment body, keeping the sentinels. Absent → `Edit` to append the fragment body bracketed by a fresh sentinel pair at EOF.
-d. **Version-pin verify-back gate:** compare shipped `fragment-version` to `config get --key fragment.version`; when advanced (or absent), `config set --key fragment.version --value <X.Y.Z>`, then re-read and refuse to advance until the read-back equals the written value.
+a. `"${CLAUDE_PLUGIN_ROOT}/scripts/core" fragment apply` — applies the shipped routing fragment into `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md` between the `<!-- anton-core:start -->` / `<!-- anton-core:end -->` sentinels (replace-in-place when present, append when absent), then pins `fragment.version` with a read-back verify gate (all inside the verb). Surface a non-zero exit as a setup-blocked notice naming the `io_error` detail; on success note `old_version → new_version` from the envelope.
 
 ### Step 5 — Stage 3: Shell access (optional)
 
@@ -142,11 +139,11 @@ Render ONE `AskUserQuestion` panel collecting the steps below; **omit any step w
 
 ## Repair (sub-flow)
 
-Re-run Steps 3–6 gated on their preconditions, narrating ONLY what was out of sync (e.g. "Routing fragment was missing — restored." / "Symlink was dangling — repointed."). Steps already in order stay silent. End with Step 7.
+Re-run Steps 3–6 gated on their preconditions, narrating ONLY what was out of sync (e.g. "Symlink was dangling — repointed."). Steps already in order stay silent. The fragment step runs `fragment apply`; narrate "Routing fragment restored." only when the verb reports `applied: true`. Read `old_version`/`new_version` from the envelope for the narration line. End with Step 7.
 
 ## Update (sub-flow)
 
-Re-run Stage 2 (fragment refresh + re-pin) and Stage 3 (launcher refresh); SKIP onboarding. Report "Routing updated v<old> → v<new>." End with Step 7.
+Run `fragment apply` (fragment refresh + re-pin) and Stage 3 (launcher refresh); SKIP onboarding. Read `old_version`/`new_version` from the verb envelope and report "Routing updated v<old_version> → v<new_version>." End with Step 7.
 
 ## Health verify (menu action)
 

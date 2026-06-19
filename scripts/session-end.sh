@@ -43,4 +43,19 @@ if command -v lsof >/dev/null 2>&1; then
     done
 fi
 
+# Orphan sweep: reap any core-dashboard whose parent is already init (ppid==1)
+# — abnormal-session-exit leftovers on a non-default port. A live session's
+# dashboard has ppid=its session, never 1, so this never touches another
+# session's server. Complements the in-process self-reap watchdog and is the
+# only path that reaps pre-watchdog orphans.
+if command -v pgrep >/dev/null 2>&1; then
+    for pid in $(pgrep -f 'dashboard' 2>/dev/null); do
+        ps -o command= -p "$pid" 2>/dev/null | grep -Eq '(^|/)anton-core[^/ ]* dashboard( |$)' || continue
+        [ "$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')" = "1" ] || continue
+        if kill "$pid" 2>/dev/null; then
+            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) reaped orphan dashboard pid $pid (ppid=1)" >>"$LOG_DIR/dashboard-reap.log" 2>/dev/null || true
+        fi
+    done
+fi
+
 exec "$ANTON_BIN" hook session-end "$@"

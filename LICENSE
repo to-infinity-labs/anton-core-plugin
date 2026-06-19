@@ -1,21 +1,46 @@
-MIT License
+anton-core Software License
 
-Copyright (c) 2026 xLightxYearx
+Copyright (c) 2026 xLightxYearx. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+anton-core (the "Software") is proprietary software. This license governs your
+use of the Software, including its binary components and its plaintext skills,
+hooks, scripts, and configuration. By installing or using the Software, you
+agree to these terms.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Grant of license.
+   You are granted a personal, non-exclusive, non-transferable, royalty-free,
+   revocable license to install and use the Software for your own purposes,
+   including use within an organization. There is no charge for this use.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. Restrictions. You may not:
+   (a) distribute, publish, sell, rent, lease, sublicense, or otherwise make the
+       Software, in whole or in part, available to any third party;
+   (b) modify, adapt, or create derivative works of the Software for
+       distribution to any third party;
+   (c) reverse engineer, decompile, or disassemble the Software's binary
+       components, except to the extent this restriction is prohibited by
+       applicable law; or
+   (d) remove or alter any copyright, license, or attribution notices.
+
+3. Name and marks.
+   This license grants no right to use the "anton-core" name or any associated
+   names, logos, or marks, except as required to describe the Software's origin.
+
+4. Third-party components.
+   The Software includes third-party components licensed under their own terms.
+   See THIRD_PARTY_LICENSES.md for the applicable notices, which govern those
+   components and are not superseded by this license.
+
+5. Reservation of rights.
+   All rights not expressly granted herein are reserved by the copyright holder.
+
+6. No warranty.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+7. Limitation of liability.
+   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+   OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.

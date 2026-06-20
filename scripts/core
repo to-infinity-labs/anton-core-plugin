@@ -100,6 +100,13 @@ if [[ "${1:-}" == "--wrapper-check" ]]; then
     else
         bin_exists=false
     fi
+    # Report whether the resolved binary path lives inside a Claude-Code-managed
+    # cache/marketplace clone — the same condition that Task 1's refuse-guard
+    # fires on in wrapper.sh. bash 3.2 case glob; no realpath.
+    case "$bin_path" in
+        */plugins/cache/*|*/plugins/marketplaces/*) bin_in_managed_cache=true ;;
+        *) bin_in_managed_cache=false ;;
+    esac
     # Dev shortcut: when a contributor runs `make build`, the binary
     # lands at $CLAUDE_PLUGIN_ROOT/bin/anton-core and wrapper.sh's
     # dev-shortcut branch prefers it over the versioned cache. Surface
@@ -145,19 +152,21 @@ if [[ "${1:-}" == "--wrapper-check" ]]; then
             --arg v   "$version" \
             --arg bp  "$bin_path" \
             --argjson be "$bin_exists" \
+            --argjson bmc "$bin_in_managed_cache" \
             --arg db  "$dev_bin" \
             --argjson dbe "$dev_bin_exists" \
             --argjson wp "$wrapper_parses" \
-            '{plugin_root:$pr, plugin_data:$pd, data_root:$pd, version:$v, bin:$bp, bin_exists:$be, dev_bin:$db, dev_bin_exists:$dbe, wrapper_parses:$wp}'
+            '{plugin_root:$pr, plugin_data:$pd, data_root:$pd, version:$v, bin:$bp, bin_exists:$be, bin_in_managed_cache:$bmc, dev_bin:$db, dev_bin_exists:$dbe, wrapper_parses:$wp}'
     else
         _esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
-        printf '{"plugin_root":"%s","plugin_data":"%s","data_root":"%s","version":"%s","bin":"%s","bin_exists":%s,"dev_bin":"%s","dev_bin_exists":%s,"wrapper_parses":%s}\n' \
+        printf '{"plugin_root":"%s","plugin_data":"%s","data_root":"%s","version":"%s","bin":"%s","bin_exists":%s,"bin_in_managed_cache":%s,"dev_bin":"%s","dev_bin_exists":%s,"wrapper_parses":%s}\n' \
             "$(_esc "$CLAUDE_PLUGIN_ROOT")" \
             "$(_esc "$CLAUDE_PLUGIN_DATA")" \
             "$(_esc "$CLAUDE_PLUGIN_DATA")" \
             "$(_esc "$version")" \
             "$(_esc "$bin_path")" \
             "$bin_exists" \
+            "$bin_in_managed_cache" \
             "$(_esc "$dev_bin")" \
             "$dev_bin_exists" \
             "$wrapper_parses"
@@ -208,8 +217,17 @@ rm -f "$_wrapper_src_err"
 # then exits 2 so callers (skill bodies, operator shells) get a real
 # non-zero status.
 if [[ -n "${BOOTSTRAP_FAIL_REASON:-}" ]]; then
-    printf '{"status":"error","error":{"kind":"precondition_missing","reason":"%s","detail":"anton-core binary unavailable; run /anton-core:setup or check network connectivity"}}\n' \
-        "$BOOTSTRAP_FAIL_REASON" >&2
+    _detail_esc=""
+    case "$BOOTSTRAP_FAIL_REASON" in
+        bin_dir_in_managed_cache)
+            _detail_esc="binary resolved into the Claude Code plugin cache/marketplace clone; run anton-core via ~/.local/bin/core (core-shim.sh), not the bundled scripts/core"
+            ;;
+        *)
+            _detail_esc="anton-core binary unavailable; run /anton-core:setup or check network connectivity"
+            ;;
+    esac
+    printf '{"status":"error","error":{"kind":"precondition_missing","reason":"%s","detail":"%s"}}\n' \
+        "$BOOTSTRAP_FAIL_REASON" "$_detail_esc" >&2
     exit 2
 fi
 

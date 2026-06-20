@@ -58,4 +58,51 @@ if command -v pgrep >/dev/null 2>&1; then
     done
 fi
 
+# Best-effort: reap orphaned data/bin subdirs left in superseded Claude Code
+# plugin-cache version dirs. Proceeds ONLY when CLAUDE_PLUGIN_ROOT sits inside
+# the CC plugin cache (…/plugins/cache/anton-core/…); dev checkouts and data
+# dirs are never swept. Only the data/bin subdir is removed — CC owns the
+# version-dir envelope and the current version is never touched. Concurrent
+# session-ends double-reap harmlessly: rm -rf on an already-gone dir is a
+# no-op under || true, and the [ -d ] guard turns the second pass into a clean
+# skip.
+#
+# Path-confinement: the case globs match the LITERAL path, which a `..`-laden
+# CLAUDE_PLUGIN_ROOT or a symlinked version-dir/data component could point out
+# of the cache subtree while still reading …/plugins/cache/anton-core/…. So the
+# delete is gated on the CANONICAL path: `cd … && pwd -P` (bash 3.2 has no
+# realpath) resolves `..` and symlinked intermediates, and an escaped target no
+# longer matches the anton-core glob, so it is skipped. A root carrying a `..`
+# path component is also refused outright up front. The final `bin` is
+# re-appended unresolved so a symlinked bin is unlinked by rm, never followed.
+# Guarded by scripts/lib/wrapper_test/session_end_cache_reap.bats.
+case "$CLAUDE_PLUGIN_ROOT" in
+    */plugins/cache/anton-core/*)
+        # Refuse to reap from a root with a `..` component (slash-bounded so a
+        # literal `foo..bar` dir name is not mistaken for traversal).
+        case "/$CLAUDE_PLUGIN_ROOT/" in
+            */../*) : ;;
+            *)
+                _cache_root="$(dirname "$CLAUDE_PLUGIN_ROOT")" || true
+                _cur="$(basename "$CLAUDE_PLUGIN_ROOT")" || true
+                for d in "$_cache_root"/*/data/bin; do
+                    [ -d "$d" ] || continue
+                    ver="$(basename "${d%/data/bin}")" || true
+                    [ "$ver" != "$_cur" ] || continue
+                    # Canonicalise the parent before deleting; re-append the
+                    # unresolved `bin` (a symlinked bin is then unlinked, not
+                    # followed). cd failure → skip (best-effort).
+                    _real="$(cd "${d%/bin}" 2>/dev/null && pwd -P)" || continue
+                    case "$_real/bin" in
+                        */plugins/cache/anton-core/*)
+                            rm -rf "$d" 2>/dev/null || true
+                            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) reaped cache binary dir $d (ver=$ver cur=$_cur root=$CLAUDE_PLUGIN_ROOT)" >>"$LOG_DIR/cache-reap.log" 2>/dev/null || true
+                            ;;
+                    esac
+                done
+                ;;
+        esac
+        ;;
+esac
+
 exec "$ANTON_BIN" hook session-end "$@"

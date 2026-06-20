@@ -260,6 +260,18 @@ _bootstrap_binary() {
         return 1
     fi
 
+    # Refuse to write into the Claude Code plugin cache/marketplace clone —
+    # those dirs are never pruned by Claude Code, so installing the binary
+    # there leaks ~55 MB per plugin version indefinitely. Match on the literal
+    # $ANTON_BIN_DIR (no realpath — the dir may not exist yet).
+    case "$ANTON_BIN_DIR" in
+        */plugins/cache/*|*/plugins/marketplaces/*)
+            _bootstrap_fail "bin_dir_in_managed_cache" \
+                "refusing to install the binary into the Claude Code plugin cache/marketplace clone ($ANTON_BIN_DIR); run anton-core via ~/.local/bin/core (core-shim.sh), not the bundled scripts/core inside the plugin cache"
+            return 1
+            ;;
+    esac
+
     # Refuse to fetch when EXPECTED_VERSION is empty — no manifest, no
     # safe URL to construct.
     if [[ -z "$EXPECTED_VERSION" ]]; then

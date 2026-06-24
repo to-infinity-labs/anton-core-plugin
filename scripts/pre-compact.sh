@@ -7,4 +7,7 @@ _extract_session_id
 if [[ -n "$SESSION_ID" ]]; then
     set -- --session-id "$SESSION_ID" "$@"
 fi
+if [[ -n "$TRANSCRIPT_PATH" ]]; then
+    set -- --transcript-path "$TRANSCRIPT_PATH" "$@"
+fi
 exec "$ANTON_BIN" hook pre-compact "$@"

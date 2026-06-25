@@ -22,7 +22,7 @@ Operator-facing review queue for improvement suggestions emitted by the deep-ana
 "${CLAUDE_PLUGIN_ROOT}/scripts/core" improvement dismiss --id <imp-id>
 ```
 
-Default `list` mode filters to pending entries; `--all` drops the filter and includes already-applied rows. `approve` flips `applied` from `0` to `1` and may optionally offer to execute the `action_taken` description — execution always requires explicit operator confirmation. `dismiss` deletes the sidecar row outright; the parent `items` row is preserved.
+The review queue defaults to pending entries (`--pending-only`); `--applied-only` surfaces the adopted set, and bare `improvement list` (no filter) returns both. `approve` flips `applied` from `0` to `1` and may optionally offer to execute the `action_taken` description — execution always requires explicit operator confirmation. `dismiss` deletes the sidecar row outright; the parent `items` row is preserved.
 
 ## Output
 

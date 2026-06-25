@@ -15,7 +15,7 @@ Serves the read-only browser dashboard on `http://127.0.0.1:7777` without tying 
 - "stop the dashboard", "kill the dashboard"
 - `/anton-core:dashboard [surface]`
 
-Surfaces: `overview` (default), `memory`, `repos`, `tasks`, `sessions`, `improvements`, `news`, `health`, `graph`.
+Surfaces: `overview` (default), `memory`, `repos`, `tasks`, `sessions`, `improvements`, `health`, `graph`.
 
 ## How
 

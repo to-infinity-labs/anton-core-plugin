@@ -51,7 +51,7 @@ Three steps, about a minute. Run the first two inside Claude Code.
 Setup fetches the signed binary for your platform, wires anton-core into Claude Code,
 and offers to register your repositories and import a knowledge folder. It runs start
 to finish **without any login, token, or account**. (A GitHub token is optional and
-only raises rate limits for the news poller.)
+only raises GitHub API rate limits.)
 
 **3 — Confirm it's working**
 

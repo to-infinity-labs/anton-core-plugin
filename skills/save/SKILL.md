@@ -24,4 +24,4 @@ Three modes share one verb. `--source-path` runs the full intake pipeline agains
 
 ## Output
 
-Success envelope reports `pipeline`, `written` (id list), `noop`, `rejected`, `counts`, `dropped_by_owner_filter`, and `stub_documents_written`. Contract: [docs/plugin-spec/05-cli-contract.md#item-save](../../docs/plugin-spec/05-cli-contract.md#item-save).
+Success envelope reports `status`, `written` (id list), `extracted`, `noop`, `rejected`, `type` (primary item type), `source_path`, `errors`, `warnings`, and `meta_used`, plus `saved_path` on a Mode 1 source copy. Contract: [docs/plugin-spec/05-cli-contract.md#item-save](../../docs/plugin-spec/05-cli-contract.md#item-save).

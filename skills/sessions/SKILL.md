@@ -17,10 +17,10 @@ Read-only browser over the session-intelligence sidecar populated by the `Sessio
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" session list [--since <epoch-ms>] [--limit N] [--format json|text]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" session get --session-id <session-id> [--format json|text]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" session stats [--days N] [--format json|text]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" session mark-reflected --session-id <session-id> [--format json|text]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" session list [--since <epoch-ms>] [--limit N]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" session get --session-id <session-id>
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" session stats [--days N]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" session mark-reflected --session-id <session-id>
 ```
 
 `--since` is an epoch-ms Int64 floor on `started_at`, not a date string. Default invocation shells `session stats --days 30` together with `session list --limit 10` and renders both blocks. `--improvements` switches to the applied-only counterpart via `"${CLAUDE_PLUGIN_ROOT}/scripts/core" improvement list --applied-only --limit 20`; pending review flows through the [improvements](../improvements/SKILL.md) skill.

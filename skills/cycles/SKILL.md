@@ -17,11 +17,11 @@ Finds simple directed cycles in the code-graph. Each cycle is reported once (rot
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query cycle-detect [--containing-id <X>] --rel-types CALLS --max-cycles K --max-cycle-len N [--exclude-ambiguous]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query cycle-detect [--containing <X>] --rel-types CALLS --max-cycles K --max-cycle-len N [--exclude-ambiguous]
 ```
 
 When `--containing <X>` is supplied, resolve `X` via the [recall](../recall/SKILL.md) skill first. All-mode seeds only `function | method | component` items; for `EXTENDS`/`IMPLEMENTS` cycles, pass `--containing <Class>` plus `--rel-types EXTENDS,IMPLEMENTS`.
 
 ## Output
 
-Standard query envelope with `shape: paths` — one row per cycle carrying `seed_id`, `path[]` (closing on the seed), `edge_types[]`, `confidence_chain[]`, `min_confidence`, and `cycle_length`. The result also carries a `nodes: {id → {title, kind}}` map and a `deduplicated_rotations` counter for rotation duplicates collapsed by the engine. Rows arrive sorted `cycle_length ASC, min_confidence DESC`. One `query_log` row per invocation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).
+Standard query envelope with `shape: paths` — one row per cycle carrying `seed_id`, `path[]` (closing on the seed), `edge_types[]`, `confidence_chain[]`, `min_confidence`, and `cycle_length`. The result also carries a `nodes: {id → {title, kind}}` map and a `deduplicated_rotations` counter for rotation duplicates collapsed by the engine. Rows arrive sorted `cycle_length ASC, then path ASC`. One `query_log` row per invocation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).

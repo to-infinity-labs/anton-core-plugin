@@ -17,11 +17,11 @@ Enumerates every directed path from `A` to `B` across the code-graph up to a dep
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query paths-between --from-id <A> --to-id <B> --rel-types CALLS --depth N --max-paths K [--shortest] [--exclude-ambiguous]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query paths-between --from-id <A> --to-id <B> --rel-types CALLS --max-depth N --max-paths K [--shortest] [--exclude-ambiguous]
 ```
 
 Resolve `<A>` and `<B>` independently via the [recall](../recall/SKILL.md) skill unless each already looks like a symbol-id. `--rel-types` accepts a comma-separated list or a JSON array literal; malformed JSON surfaces as a parser error at the CLI rather than at the SQL layer.
 
 ## Output
 
-Standard query envelope with `shape: paths` — one row per enumerated path carrying `path[]`, `edge_types[]`, `confidence_chain[]`, `min_confidence`, and `path_length`. The result also includes a `nodes: {id → {title, kind}}` map for renderers. Rows are pre-sorted `hop ASC, min_confidence DESC`. Unreachable target returns `rows: []`. One `query_log` row per invocation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).
+Standard query envelope with `shape: paths` — one row per enumerated path carrying `path[]`, `edge_types[]`, `confidence_chain[]`, `min_confidence`, and `path_length`. The result also includes a `nodes: {id → {title, kind}}` map for renderers. Rows are pre-sorted `path_length ASC, then path ASC`. Unreachable target returns `rows: []`. One `query_log` row per invocation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).

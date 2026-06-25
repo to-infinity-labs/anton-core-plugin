@@ -6,7 +6,7 @@ allowed-tools: Bash
 
 ## What it does
 
-Morning-briefing surface. Produces one owner-scoped overview of open tasks, the overdue and due-today slices, recently-completed work, knowledge gaps, session-intelligence counters, and a stats footer — composed from a single round-trip into the summary-rollup handler. (External news headlines are not part of this envelope; use `/anton-core:news` for that surface.)
+Morning-briefing surface. Produces one owner-scoped overview of open tasks, the overdue and due-today slices, recently-completed work, knowledge gaps, session-intelligence counters, and a stats footer — composed from a single round-trip into the summary-rollup handler.
 
 ## When to use
 
@@ -17,7 +17,7 @@ Morning-briefing surface. Produces one owner-scoped overview of open tasks, the 
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" report summary [--date <YYYY-MM-DD>] [--period daily|weekly] [--format json|text]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" report summary [--date <YYYY-MM-DD>] [--period daily|weekly]
 ```
 
 Default anchors on today's UTC date with the `daily` period (one-day `completed_recent` window); `--period weekly` widens that window to seven days. The verb is read-only — rendering and any operator-facing markdown belong to downstream skills.

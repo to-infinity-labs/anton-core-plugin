@@ -6,7 +6,7 @@ allowed-tools: Bash
 
 ## What it does
 
-Walks `CALLS` edges backward from a symbol-id to surface every caller — direct and transitive — up to a depth bound. Answers "who depends on this function?" without leaving the code-graph surface. The mirror of `callees`: same template family, opposite direction.
+Walks `CALLS` edges backward from a symbol-id to surface every caller — direct and transitive — up to a depth bound. Answers "who depends on this function?" without leaving the code-graph surface. The mirror of `callees`: same template family, opposite direction. Edges are sourced at the enclosing function or method, so each caller returned is the calling function itself, not merely its containing file.
 
 ## When to use
 
@@ -24,7 +24,7 @@ Resolve `<symbol>` first via the [recall](../recall/SKILL.md) skill unless the i
 
 ## Output
 
-Standard query envelope with `shape: node-set` — one row per visited symbol, sorted `hop ASC, id ASC`, each carrying its `hop`, `path[]`, `edge_types[]`, and `min_confidence` from the per-edge `relationships.confidence` column. One `query_log` row is written regardless of success, timeout, or truncation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).
+A `transitive-walk` envelope — top-level `status`, `template` (the discriminator, here `"transitive-walk"`), `rows`, `nodes`, `row_count`, `limit_value`, `truncated`, and `truncated_reason`. One row per visited symbol, sorted `hop ASC, id ASC`, each carrying its `id`, `hop`, `path[]`, `edge_types[]`, `confidence_chain[]`, and `min_confidence` from the per-edge `relationships.confidence` column; `nodes` maps each id to its `{title, kind}`. One `query_log` row is written regardless of success, timeout, or truncation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).
 
 ## See also
 

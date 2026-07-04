@@ -64,8 +64,16 @@ if [[ "${1:-}" == "--launcher-check" ]]; then
     fi
     if [[ -x "$_current" ]]; then
         _live_binary="ok"
+        # Report the LIVE binary's own version so a stale-installed-binary
+        # incident (old binary × newer schema) is visible from the diagnostic
+        # the operator already runs. `--version` is DB-less (the binary's
+        # argsNeedNoDB fast-path), so this capture needs no data root and never
+        # execs the CLI flow — it is a probe, not the exec handoff below.
+        _binary_version="$("$_current" --version 2>/dev/null || echo '<unavailable>')"
+        [[ -n "$_binary_version" ]] || _binary_version="<unavailable>"
     else
         _live_binary="<missing or not executable>"
+        _binary_version="<unavailable>"
     fi
     if [[ -n "${CORE_DATA_DIR:-}" ]]; then _core_data_dir="$CORE_DATA_DIR"; else _core_data_dir="<unset>"; fi
     if [[ -d "./data" ]]; then _devmode="present (\$PWD/data)"; else _devmode="<absent>"; fi
@@ -75,6 +83,7 @@ if [[ "${1:-}" == "--launcher-check" ]]; then
     printf '  current_link:    %s\n' "$_current"
     printf '  current_target:  %s\n' "$_current_target"
     printf '  live_binary:     %s\n' "$_live_binary"
+    printf '  binary_version:  %s\n' "$_binary_version"
     printf '  data-root resolution (launcher sets no env; binary self-resolves):\n'
     printf '    CORE_DATA_DIR:               %s\n' "$_core_data_dir"
     printf '    dev-mode ./data:             %s\n' "$_devmode"

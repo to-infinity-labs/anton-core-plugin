@@ -24,4 +24,4 @@ The skill's user-facing surface is `remove`; the underlying cobra verb is `delet
 
 ## Output
 
-Success envelope reports `status`, `id`, and `deleted` (boolean — `false` only when no row matched). Contract: [docs/plugin-spec/05-cli-contract.md#item-delete](../../docs/plugin-spec/05-cli-contract.md#item-delete).
+Success envelope reports `status`, `id`, and `deleted` (boolean). A real delete of an existing row returns `deleted:true`. Deleting a nonexistent id is not a `deleted:false` success — it hard-errors with `{"error":{"kind":"entity_not_found","detail":"entity not found: item \"<id>\" not found"}}`. `deleted:false` appears only under `--dry-run`, where the envelope also carries `dry_run:true` and reports what the delete would remove without writing. A `warnings` array of non-fatal cascade notes (e.g. a source file under the knowledge dir that could not be resolved or unlinked) is present only when the delete produced at least one. Contract: [docs/plugin-spec/05-cli-contract.md#item-delete](../../docs/plugin-spec/05-cli-contract.md#item-delete).

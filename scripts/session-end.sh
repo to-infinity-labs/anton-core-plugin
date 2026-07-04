@@ -11,15 +11,23 @@ if [[ -n "$TRANSCRIPT_PATH" ]]; then
     set -- --transcript-path "$TRANSCRIPT_PATH" "$@"
 fi
 
-# Background prefetch; never blocks SessionEnd. Stderr is tee'd to a data-dir
-# log (mirroring session-start.sh) so a silent prefetch failure — asset
-# missing, disk full, arch mismatch — leaves a forensic trail instead of
-# vanishing into /dev/null. The orchestrator additionally records
-# PREFETCH_FAILED (verification) / PREFETCH_DEFERRED (transient) rows in
-# events_log for the /health and `update status` surfaces.
+# Background prefetch; never blocks SessionEnd. Routed through
+# `hook spawn-detached` so the child runs in its OWN session (Setsid) and
+# survives Claude Code's session-group teardown — a bare `( … & )` leaves
+# the child in the hook's process group, where the teardown signal can
+# reap it mid-run (macOS ships no `setsid`, so the detach is done in-binary).
+# The outer `( … & )` keeps the brief spawn-detached launch off SessionEnd's
+# critical path; stderr is tee'd to a data-dir log so a silent prefetch
+# failure — asset missing, disk full, arch mismatch — leaves a forensic
+# trail. The orchestrator additionally records PREFETCH_FAILED /
+# PREFETCH_DEFERRED rows in events_log for /health and `update status`.
 LOG_DIR="${CLAUDE_PLUGIN_DATA:-/tmp}/data/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-("$ANTON_BIN" update prefetch --quiet --budget 60s 1>/dev/null 2>>"$LOG_DIR/update.err" &)
+# SC2094: `--log` (the detached child's stdout+stderr) and `2>>` (the launcher's
+# own Warn output) both APPEND to update.err from distinct processes — no read,
+# no truncation, so the read/write collision the rule guards against cannot occur.
+# shellcheck disable=SC2094
+("$ANTON_BIN" hook spawn-detached --log "$LOG_DIR/update.err" -- "$ANTON_BIN" update prefetch --quiet --budget 60s 1>/dev/null 2>>"$LOG_DIR/update.err" &)
 
 # Best-effort: reap a session-scoped dashboard server on the default port.
 # LISTEN-filtered (a bare port query also matches established browser
@@ -106,9 +114,15 @@ case "$CLAUDE_PLUGIN_ROOT" in
 esac
 
 # Best-effort: fire a consolidation pass (Link always; Dream/RunAll on their
-# own cooldowns). Detached + --quiet so SessionEnd never blocks on an LLM pass;
-# the maintenance file-lock serializes against any concurrent consolidate, and
-# stderr is appended to a data-dir log so a silent failure leaves a trail.
-("$ANTON_BIN" maintenance consolidate --quiet 1>/dev/null 2>>"$LOG_DIR/consolidate.err" &)
+# own cooldowns). Routed through `hook spawn-detached` so the LLM pass runs
+# in its own session (Setsid) and survives SessionEnd teardown rather than
+# being reaped with the hook's process group; --quiet so it never blocks.
+# The maintenance file-lock serializes against any concurrent consolidate,
+# and stderr is appended to a data-dir log so a silent failure leaves a trail.
+# SC2094: `--log` (the detached child's stdout+stderr) and `2>>` (the launcher's
+# own Warn output) both APPEND to consolidate.err from distinct processes — no
+# read, no truncation, so the rule's read/write collision cannot occur.
+# shellcheck disable=SC2094
+("$ANTON_BIN" hook spawn-detached --log "$LOG_DIR/consolidate.err" -- "$ANTON_BIN" maintenance consolidate --quiet 1>/dev/null 2>>"$LOG_DIR/consolidate.err" &)
 
 exec "$ANTON_BIN" hook session-end "$@"

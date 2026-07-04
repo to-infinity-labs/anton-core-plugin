@@ -17,10 +17,10 @@ Walks a directory, classifies each file, and routes every file through the same 
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" item bulk-import --path <dir> [--recursive] [--dry-run] [--format jsonl|summary] [--quiet]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" item bulk-import --path <dir> [--recursive] [--dry-run] [--format json|jsonl|summary] [--concurrency N] [--quiet]
 ```
 
-Use `--dry-run` first to preview the file count and classification before any write. Re-running against the same directory detects the checkpoint and skips completed files.
+Use `--dry-run` first to preview the file count and classification before any write. Re-running against the same directory detects the checkpoint and skips completed files. `--format` defaults to `jsonl` (streaming); `--concurrency` sets the per-batch concurrent save count (>= 1, default 3).
 
 ## Output
 

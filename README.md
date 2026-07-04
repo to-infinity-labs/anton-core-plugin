@@ -38,7 +38,7 @@ Three steps, about a minute. Run the first two inside Claude Code.
 **1 — Add the marketplace and install the plugin**
 
 ```
-/plugin marketplace add xlightxyearx/anton-core-plugin
+/plugin marketplace add to-infinity-labs/anton-core-plugin
 /plugin install anton-core@anton-core
 ```
 
@@ -111,7 +111,7 @@ The binary ships as a signed release artifact, and setup verifies it before it e
 - **Signatures, when available.** With [cosign](https://github.com/sigstore/cosign)
   installed, setup additionally verifies a keyless Sigstore signature.
 
-Prefer to verify it yourself? Every [release](https://github.com/xlightxyearx/anton-core-plugin/releases)
+Prefer to verify it yourself? Every [release](https://github.com/to-infinity-labs/anton-core-plugin/releases)
 publishes the per-platform binaries, a `checksums.txt`, and a `.sigstore.json` signature
 bundle per binary. To check a download by hand (macOS shown; use `sha256sum` on Linux):
 

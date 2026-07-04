@@ -6,7 +6,7 @@ allowed-tools: Bash
 
 ## What it does
 
-Morning-briefing surface. Produces one owner-scoped overview of open tasks, the overdue and due-today slices, recently-completed work, knowledge gaps, session-intelligence counters, and a stats footer — composed from a single round-trip into the summary-rollup handler.
+Morning-briefing surface. Produces one overview of open tasks, the overdue and due-today slices, recently-completed work, knowledge gaps, session-intelligence counters, and a stats footer — composed from a single round-trip into the summary-rollup handler. `my_tasks` is the full open-task list (unscoped, agreeing with the tasks surface); `team_tasks` carries the operator-vs-team split.
 
 ## When to use
 
@@ -24,4 +24,4 @@ Default anchors on today's UTC date with the `daily` period (one-day `completed_
 
 ## Output
 
-Single consolidated envelope carries `owner`, `period`, `ref_date`, plus `my_tasks`, `team_tasks`, `overdue`, `due_today`, `completed_recent`, `stats.counts`, `session_intelligence`, `search_misses`, and `recent_items` blocks — each with its own item list and count. All eleven queries run against one SQLite connection; the handler is read-only on the data path. Contract: [docs/plugin-spec/05-cli-contract.md#report-summary](../../docs/plugin-spec/05-cli-contract.md#report-summary).
+Single consolidated envelope carries `owner`, `period`, `ref_date`, plus the `my_tasks`, `team_tasks`, `overdue`, `due_today`, `completed_recent`, `stats.counts`, `session_intelligence`, `search_misses`, and `recent_items` blocks — each with its own item list and count. It also always carries `compress_saved` (`{bytes_saved, tokens_saved_est}`) and `connections_opened` (fixed at `1` by the single-connection invariant). A `graph_growth` string (formatted `Knowledge graph: edges +N, themes +M since <ref_date>`) is present only when the window saw growth; it is omitted on an idle day or when the growth read degrades. All eleven queries run against one SQLite connection; the handler is read-only on the data path. Contract: [docs/plugin-spec/05-cli-contract.md#report-summary](../../docs/plugin-spec/05-cli-contract.md#report-summary).

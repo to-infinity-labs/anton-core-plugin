@@ -17,11 +17,15 @@ Single entry point for content entering the knowledge base. Auto-categorises pas
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" item save [--source-path <file> | --items-json <array> | --type T --title T --content C]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" item save [--source-path <file> | --items-json <array> | --items-file <file> | --type T --title T --content C [--summary S] [--tags a,b,c] [--importance F]]
 ```
 
-Three modes share one verb. `--source-path` runs the full intake pipeline against a file on disk. `--items-json` (or `--items-file`) writes a pre-parsed batch straight through reconcile and write. `--type` + `--title` + `--content` is the single-item shorthand for narrative the operator already has typed up.
+Three modes share one verb. `--source-path` runs the full intake pipeline against a file on disk. `--items-json` (or `--items-file`) writes a pre-parsed batch straight through reconcile and write. `--type` + `--title` + `--content` is the single-item shorthand for narrative the operator already has typed up; it also accepts `--summary`, `--tags` (comma-separated — note this verb takes a CSV list, unlike the repeatable `--tag` on `task add`), and `--importance` (`[0.0, 1.0]`, default `1`).
 
 ## Output
 
 Success envelope reports `status`, `written` (id list), `extracted`, `noop`, `rejected`, `type` (primary item type), `source_path`, `errors`, `warnings`, and `meta_used`, plus `saved_path` on a Mode 1 source copy. Contract: [docs/plugin-spec/05-cli-contract.md#item-save](../../docs/plugin-spec/05-cli-contract.md#item-save).
+
+## Curation
+
+Curate, don't accrete. Before saving, `recall` related memories; if the new note updates or corrects one that already exists, `item update --id <id>` (or `remove`) it in place rather than appending a second, divergent version. Best-effort by design — a missed reconcile is benign, but the store stays cleaner when supersession is in-place.

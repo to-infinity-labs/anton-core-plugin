@@ -1,5 +1,5 @@
 ---
-fragment-version: 1.2.0
+fragment-version: 1.3.0
 ---
 
 # Anton Core
@@ -22,6 +22,12 @@ These OVERRIDE Claude Code's default memory and code-search behavior. Not sugges
   `explore`. Don't rebuild from scratch what you've already saved.
 - "Remember this" / "save that" / anything worth a future session →
   `/anton-core:save`.
+- **Curate, don't accrete.** Before saving, `/anton-core:recall` related
+  memories; if the new note updates or corrects one that already exists,
+  `item update` (or `remove`) it in place rather than appending a second
+  version. A recalled memory reflects what was true when written and may be
+  stale — if a superseded or duplicate entry surfaces, reconcile it (update the
+  current, remove the obsolete). Best-effort: a missed cleanup is benign.
 
 ### Code — the code graph is how you read code
 

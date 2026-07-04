@@ -118,7 +118,7 @@ _semver_satisfies() {
 # line `vX.Y.Z\n` written by `core update apply-if-staged` after the health
 # gate passes). The pin decouples the running binary from Claude Code's
 # /plugin update cadence: a `git pull` that bumps plugin.json never changes
-# which binary the wrapper exec's. Per docs/superpowers/specs/2026-05-28-
+# which binary the wrapper exec's. Per docs/specs/2026-05-28-
 # update-ergonomics-design.md § "wrapper.sh change".
 #
 # Fallback to .claude-plugin/plugin.json .version applies only when the pin
@@ -390,7 +390,7 @@ _bootstrap_binary() {
     # verify looks. Required download — hard-fail on error. `… || dl_rc=$?` (not
     # a bare `curl …; dl_rc=$?`) is required under set -e: a failing simple
     # command would abort the function before the assignment.
-    local repo_slug="xlightxyearx/anton-core-plugin"
+    local repo_slug="to-infinity-labs/anton-core-plugin"
     local base_url="https://github.com/${repo_slug}/releases/download/v${EXPECTED_VERSION}"
     local dl_err="${__bootstrap_tmpdir}/curl-download.err" dl_rc=0
     curl -fsSL -o "$bin_tmp" "${base_url}/${binary_name}" 2>"$dl_err" || dl_rc=$?
@@ -455,7 +455,7 @@ _bootstrap_binary() {
         if ! curl -fsSL -o "$bundle_tmp" "${base_url}/${binary_name}.sigstore.json" 2>/dev/null; then
             printf '⚠ bootstrap: cosign installed but bundle fetch failed; skipping supply-chain verification\n' >&2
         elif cosign verify-blob \
-                --certificate-identity-regexp '^https://github\.com/xlightxyearx/anton-core-go/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$' \
+                --certificate-identity-regexp '^https://github\.com/to-infinity-labs/anton-core-go/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$' \
                 --certificate-oidc-issuer https://token.actions.githubusercontent.com \
                 --certificate-github-workflow-trigger push \
                 --bundle "$bundle_tmp" \

@@ -6,7 +6,7 @@ allowed-tools: Bash
 
 ## What it does
 
-Enumerates every directed path from `A` to `B` across the code-graph up to a depth bound, capped at `K` paths. With `--shortest`, restricts the result to paths whose length equals the minimum length found across the walk. Walks `CALLS` by default; multi-rel via `--rel-types`.
+Enumerates every directed path from `A` to `B` across the code-graph up to a depth bound, capped at `K` paths. With `--shortest`, returns only the shortest path (sets `max-paths=1`). Walks `CALLS` by default; multi-rel via `--rel-types`.
 
 ## When to use
 
@@ -24,4 +24,4 @@ Resolve `<A>` and `<B>` independently via the [recall](../recall/SKILL.md) skill
 
 ## Output
 
-Standard query envelope with `shape: paths` — one row per enumerated path carrying `path[]`, `edge_types[]`, `confidence_chain[]`, `min_confidence`, and `path_length`. The result also includes a `nodes: {id → {title, kind}}` map for renderers. Rows are pre-sorted `path_length ASC, then path ASC`. Unreachable target returns `rows: []`. One `query_log` row per invocation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).
+A `paths-between` envelope — `template` is the discriminator, here `"paths-between"`. One row per enumerated path carrying `path[]`, `edge_types[]`, `confidence_chain[]`, `min_confidence`, and `path_length`. Alongside `rows` it includes `nodes: {id → {title, kind}}` for renderers, plus top-level `status`, `row_count`, `limit_value`, `truncated`, and `truncated_reason`. Rows are pre-sorted `path_length ASC, then path ASC`. Unreachable target returns `rows: []`. One `query_log` row per invocation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).

@@ -6,7 +6,7 @@ allowed-tools: Bash
 
 ## What it does
 
-Fetches full content for one or more memory items by id. Multi-id calls also upsert pairwise co-access rows into `co_access_pairs` between the touched items — the system's primary engagement signal — so the retrieval graph learns which rows the operator looked at together. Natural follow-up to `recall`: the `<memory-ids>` trailer is the input.
+Fetches full content for one or more memory items by id. Multi-id calls also upsert pairwise co-access rows into `co_access_pairs` between the touched items — the system's primary engagement signal — so the retrieval graph learns which rows the operator looked at together. Natural follow-up to `recall`: recall's per-hit ids (`items[].id`) are the input.
 
 ## When to use
 
@@ -24,7 +24,7 @@ The skill's user-facing surface is `expand`; the underlying cobra verb is `get`.
 
 ## Output
 
-Success envelope carries `items` (input-order array of `{id, type, title, summary, content}` rows), `missing_ids` (any ids that didn't resolve), and — under `--include-relationships` — `relationships` (outbound edges per resolved id). With two or more resolved ids, one row per unordered pair is upserted into `co_access_pairs`. Contract: [docs/plugin-spec/05-cli-contract.md#item-get](../../docs/plugin-spec/05-cli-contract.md#item-get).
+Success envelope carries `items` (input-order array of `{id, type, title, summary, content}` rows — each also carrying `tags`, `created`, and `last_accessed` when the row has them), `count` (number of resolved rows), `co_access_pairs_added` (pairwise co-access rows upserted on this call), `missing_ids` (any ids that didn't resolve), and — under `--include-relationships` — `relationships` (outbound edges per resolved id). With two or more resolved ids, one row per unordered pair is upserted into `co_access_pairs`. Contract: [docs/plugin-spec/05-cli-contract.md#item-get](../../docs/plugin-spec/05-cli-contract.md#item-get).
 
 ## See also
 

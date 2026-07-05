@@ -6,7 +6,7 @@ allowed-tools: Bash
 
 ## What it does
 
-Runs a fused search over the unified store — vector KNN, dual FTS across title/summary and content body, a graph walk, freshness modulation, and task-priority boosts — and returns the ranked pool. Default rendering is the wrapped JSON envelope; `--format text` opts in to a `<memory>` block that renders each hit title-first with an indented snippet of the matched passage and an `id · matched · score · age[ · source]` metadata line. Downstream skills like `expand` and `explore` chain on the per-hit ids (`items[].id` in JSON, or the id on each text hit's metadata line).
+Runs a fused search over the unified store — vector KNN, dual FTS across title/summary and content body, a graph walk, freshness modulation, and task-priority boosts — and returns the ranked pool. Default rendering is the wrapped JSON envelope; `--format text` opts in to a `<memory>` block whose hits each render as one `<hit …>` element — metadata as attributes (`id`, `type`, `cos`, `arm`, `age`, and the conditional `links`/`superseded-by`/`source`/`due`/`status`), the full title and a `▸` snippet line as body, closed by `</hit>`. Downstream skills like `expand` and `explore` chain on the per-hit ids (`items[].id` in JSON, or each text hit's `id` attribute).
 
 ## When to use
 
@@ -26,7 +26,7 @@ Code recall ranks symbols defined in test files below every production symbol, s
 
 ## Output
 
-Default success envelope is `{"items":[...],"count":N}`; `--format text` emits the `<memory>` block (title-first hits, indented snippet, `id · matched · score · age[ · source]` metadata line). A code hit's `source` is `<slug>:<relpath>:<line>` (the line segment present when the symbol's starting line is known), giving a direct jump target. Every call writes one row to `events.access_log` capturing `result_signals` (the bump state). Contract: [docs/plugin-spec/05-cli-contract.md#memory-recall](../../docs/plugin-spec/05-cli-contract.md#memory-recall).
+Default success envelope is `{"items":[...],"count":N}`; `--format text` emits the `<memory>` block of `<hit>` elements (metadata as attributes — `cos` is the vector cosine to two decimals, or `-` when the hit carried no vector evidence — with the full title and a `▸` snippet line as body). A code hit's `source` attribute is `<slug>:<relpath>:<line>` (the line segment present when the symbol's starting line is known), giving a direct jump target. Every call writes one row to `events.access_log` capturing `result_signals` (the bump state). Contract: [docs/plugin-spec/05-cli-contract.md#memory-recall](../../docs/plugin-spec/05-cli-contract.md#memory-recall).
 
 ## Curation
 

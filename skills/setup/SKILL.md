@@ -6,7 +6,7 @@ allowed-tools: Read, Edit, Bash, AskUserQuestion
 
 ## What it does
 
-State-aware installer and lifecycle surface for anton-core. On invocation it runs a **state probe** (no install-state change; it records one classification line to the events log), classifies the install (fresh / healthy-current / update-available / partial), and either runs a clean first-time setup straight through or opens a guided menu (Health check · Reconfigure · Update or Repair · Uninstall). Mechanical plumbing — binary bootstrap, data-root persistence, the operator-shell launcher, the version-pin verify-back gate, the bootstrap-lock — runs silently behind four named progress stages. Supports `--check` (status, no install-state change), `--re-onboard`, and `--uninstall [--purge-data]`. Every binary call routes through `${CLAUDE_PLUGIN_ROOT}/scripts/core`, which auto-fetches the per-platform artifact on first call (see [ADR-0032](../../docs/adr/0032-marketplace-binary-distribution.md)). Two adjacent operator verbs sit outside this concierge flow and are invoked directly: `setup install-daemon` renders and installs the watch-daemon supervisor unit (launchd/systemd), and `setup uninstall-daemon` removes it.
+State-aware installer and lifecycle surface for anton-core. On invocation it runs a **state probe** (no install-state change; it records one classification line to the events log), classifies the install (fresh / healthy-current / update-available / partial), and either runs a clean first-time setup straight through or opens a guided menu (Health check · Reconfigure · Update or Repair · Uninstall). Mechanical plumbing — binary bootstrap, data-root persistence, the operator-shell launcher, the version-pin verify-back gate, the bootstrap-lock — runs silently behind four named progress stages. Supports `--check` (status, no install-state change), `--re-onboard`, and `--uninstall [--purge-data]`. Every binary call routes through `${CLAUDE_PLUGIN_ROOT}/scripts/core`, which never fetches — on a missing binary it emits a `binary_missing_run_setup` precondition envelope and exits non-zero. The synchronous per-platform binary fetch runs ONLY here under setup, via `${CLAUDE_PLUGIN_ROOT}/scripts/lib/bootstrap-fetch.sh` (see [ADR-0037](../../docs/adr/0037-public-distribution.md) public distribution, and [ADR-0051](../../docs/adr/0051-hooks-answer-or-enqueue.md) hooks answer or enqueue). Two adjacent operator verbs sit outside this concierge flow and are invoked directly: `setup install-daemon` renders and installs the watch-daemon supervisor unit (launchd/systemd), and `setup uninstall-daemon` removes it.
 
 ## When to use
 
@@ -70,7 +70,7 @@ Classify (first match wins):
 "${CLAUDE_PLUGIN_ROOT}/scripts/core" event log --source setup --severity info --type SETUP_CLASSIFIED --subject <classification> --detail "pinned=<pin> shipped=<shipped> symlink=<state>"
 ```
 
-On a fresh box (`events.db` absent — the health step was also skipped), DEFER this line to Step 3d (after `db init` creates the databases). A failed `event log` is a one-line warning, never a block. This is the only thing the probe writes, and it is an append-only observation — not an install-state change.
+On a fresh box (`events.db` absent — the health step was also skipped), DEFER this line to Step 3e (after `db init` creates the databases). A failed `event log` is a one-line warning, never a block. This is the only thing the probe writes, and it is an append-only observation — not an install-state change.
 
 ## Step 2 — Routing
 
@@ -91,10 +91,15 @@ Match in order (first match wins):
 
 Print `1/4 Foundation`. Run, in order:
 
-a. `"${CLAUDE_PLUGIN_ROOT}/scripts/core" db init` — materializes `core.db` + `events.db`, applies migrations, seeds DEFAULT_CONFIG (`INSERT OR IGNORE`). Idempotent. Surface a non-zero exit as a setup-blocked notice naming the precondition `reason`.
-b. `"${CLAUDE_PLUGIN_ROOT}/scripts/core" setup persist-data-dir` — records the resolved data root in `~/.anton-core/config.json`. Non-fatal: a failure is a one-line warning.
-c. `"${CLAUDE_PLUGIN_ROOT}/scripts/core" setup get-token --format json`. **Exit 0:** read the token from stderr (single line, no decoding) and prepend `ANTON_GITHUB_TOKEN=<token>` to every subsequent `"${CLAUDE_PLUGIN_ROOT}/scripts/core"` call in this run; never print it. **Exit 3:** proceed without a token — do not prompt for `gh auth login`, do not abort (the token only raises GitHub API rate limits).
-d. **Deferred classification telemetry (fresh only).** When the probe classified **fresh** (so `events.db` did not exist at Step 1), record the now-deferrable line — `"${CLAUDE_PLUGIN_ROOT}/scripts/core" event log --source setup --severity info --type SETUP_CLASSIFIED --subject fresh --detail "provenance=<truly-fresh|hook-bootstrapped>"` (use `hook-bootstrapped` when `core.db` already existed at Step 1, else `truly-fresh`). A failed `event log` is a one-line warning.
+a. **Binary install (fresh box only).** When no binary resolves yet — no pin at `${CLAUDE_PLUGIN_DATA}/data/state/installed-version` with a matching `data/versions/v<ver>/anton-core`, and no staged binary — fetch and rotate it in:
+   1. `"${CLAUDE_PLUGIN_ROOT}/scripts/lib/bootstrap-fetch.sh"` — the setup-only synchronous fetch: it downloads + checksum/cosign-verifies the per-platform release binary, installs it at `data/versions/v<ver>/anton-core`, and writes `data/state/staged-update.json` (the prefetch record). Surface a **non-zero exit as a setup-blocked notice** naming the machine-parseable `reason=<…>` from its stderr — then stop (nothing downstream can run without a binary).
+   2. `"${CLAUDE_PLUGIN_ROOT}/scripts/core" update apply-if-staged` — rotates the just-staged slot to `data/versions/current` and writes the first pin (the ONLY pin writer). The wrapper's staged-slot fallback resolves the freshly-installed staged binary so `scripts/core` can run this. Surface a non-zero exit as a setup-blocked notice.
+
+   **Idempotent:** skip both when a valid pin + binary already resolve (a re-run, repair, or hook-bootstrapped box). This step is a no-op on every non-fresh install.
+b. `"${CLAUDE_PLUGIN_ROOT}/scripts/core" db init` — materializes `core.db` + `events.db`, applies migrations, seeds DEFAULT_CONFIG (`INSERT OR IGNORE`). Idempotent. Surface a non-zero exit as a setup-blocked notice naming the precondition `reason`.
+c. `"${CLAUDE_PLUGIN_ROOT}/scripts/core" setup persist-data-dir` — records the resolved data root in `~/.anton-core/config.json`. Non-fatal: a failure is a one-line warning.
+d. `"${CLAUDE_PLUGIN_ROOT}/scripts/core" setup get-token --format json`. **Exit 0:** read the token from stderr (single line, no decoding) and prepend `ANTON_GITHUB_TOKEN=<token>` to every subsequent `"${CLAUDE_PLUGIN_ROOT}/scripts/core"` call in this run; never print it. **Exit 3:** proceed without a token — do not prompt for `gh auth login`, do not abort (the token only raises GitHub API rate limits).
+e. **Deferred classification telemetry (fresh only).** When the probe classified **fresh** (so `events.db` did not exist at Step 1), record the now-deferrable line — `"${CLAUDE_PLUGIN_ROOT}/scripts/core" event log --source setup --severity info --type SETUP_CLASSIFIED --subject fresh --detail "provenance=<truly-fresh|hook-bootstrapped>"` (use `hook-bootstrapped` when `core.db` already existed at Step 1, else `truly-fresh`). A failed `event log` is a one-line warning.
 
 ### Step 4 — Stage 2: Connect to Claude
 

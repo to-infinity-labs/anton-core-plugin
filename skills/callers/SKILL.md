@@ -17,10 +17,10 @@ Walks `CALLS` edges backward from a symbol-id to surface every caller — direct
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query transitive-walk --seed-id <id> --direction in --rel-types CALLS --depth N [--exclude-ambiguous]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query transitive-walk --seed-id <id> --direction in --rel-types CALLS --depth N [--exclude-ambiguous] [--repo <slug>]
 ```
 
-Resolve `<symbol>` first via the [recall](../recall/SKILL.md) skill unless the input already looks like a symbol-id. With `--paths-to <Y>`, reroute to `paths-between Y X` instead — the walker enumerates explicit call chains rather than the caller fan-out.
+Resolve `<symbol>` first via the [recall](../recall/SKILL.md) skill unless the input already looks like a symbol-id. With `--paths-to <Y>`, reroute to `paths-between Y X` instead — the walker enumerates explicit call chains rather than the caller fan-out. When the session's working directory is not the registered checkout (a superset worktree, any foreign cwd), pass `--repo <slug>` to walk the registered repo's graph instead of the cwd's (empty) store.
 
 ## Output
 

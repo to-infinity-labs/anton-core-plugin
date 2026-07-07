@@ -20,7 +20,7 @@ Single entry point for content entering the knowledge base. Auto-categorises pas
 "${CLAUDE_PLUGIN_ROOT}/scripts/core" item save [--source-path <file> | --items-json <array> | --items-file <file> | --type T --title T --content C [--summary S] [--tags a,b,c] [--importance F]]
 ```
 
-Three modes share one verb. `--source-path` runs the full intake pipeline against a file on disk. `--items-json` (or `--items-file`) writes a pre-parsed batch straight through reconcile and write. `--type` + `--title` + `--content` is the single-item shorthand for narrative the operator already has typed up; it also accepts `--summary`, `--tags` (comma-separated — note this verb takes a CSV list, unlike the repeatable `--tag` on `task add`), and `--importance` (`[0.0, 1.0]`, default `1`).
+Three modes share one verb. `--source-path` runs the full intake pipeline against a file on disk. `--items-json` (or `--items-file`) writes a pre-parsed batch straight through reconcile and write. `--type` + `--title` + `--content` is the single-item shorthand for narrative the operator already has typed up; it also accepts `--summary`, `--tags` (comma-separated — note this verb takes a CSV list, unlike the repeatable `--tag` on `task add`), and `--importance` (`[0.0, 1.0]`, default `1`). Give `--type` a canonical type — `document`, `reference`, `project`, `feedback`, `note`, `fact`, `decision`, or `question`; an unrecognized value is coerced to `note` (a known synonym folds to its target) and the original is preserved on a `raw_type:` tag, so a save never fails on an unexpected type.
 
 ## Output
 

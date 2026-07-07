@@ -10,7 +10,8 @@
 # DELIBERATELY MINIMAL. It sources nothing (in particular NOT
 # scripts/lib/wrapper.sh), exports no environment, and performs no
 # bootstrap/cosign. The bare binary self-resolves its data root with no env
-# (CORE_DATA_DIR -> dev-mode ./data -> ~/.anton-core/config.json), and binary
+# (CORE_DATA_DIR -> CORE_DEV_MODE-gated ./data -> ~/.anton-core/config.json),
+# and binary
 # bootstrap + supply-chain verification are the hooks' job. Duplicating the
 # wrapper here would re-couple the operator entry point to a rotating cache —
 # exactly what this fixes.
@@ -76,7 +77,15 @@ if [[ "${1:-}" == "--launcher-check" ]]; then
         _binary_version="<unavailable>"
     fi
     if [[ -n "${CORE_DATA_DIR:-}" ]]; then _core_data_dir="$CORE_DATA_DIR"; else _core_data_dir="<unset>"; fi
-    if [[ -d "./data" ]]; then _devmode="present (\$PWD/data)"; else _devmode="<absent>"; fi
+    if [[ -d "./data" ]]; then
+        if [[ -n "${CORE_DEV_MODE:-}" ]]; then
+            _devmode="enabled (\$PWD/data, CORE_DEV_MODE set)"
+        else
+            _devmode="gated off (\$PWD/data present, CORE_DEV_MODE unset)"
+        fi
+    else
+        _devmode="<absent>"
+    fi
     if [[ -f "${HOME:-}/.anton-core/config.json" ]]; then _opcfg="present"; else _opcfg="<absent>"; fi
     printf 'anton-core operator launcher\n'
     printf '  launcher:        %s\n' "$_script_path"

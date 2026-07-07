@@ -11,23 +11,14 @@ if [[ -n "$TRANSCRIPT_PATH" ]]; then
     set -- --transcript-path "$TRANSCRIPT_PATH" "$@"
 fi
 
-# Background prefetch; never blocks SessionEnd. Routed through
-# `hook spawn-detached` so the child runs in its OWN session (Setsid) and
-# survives Claude Code's session-group teardown — a bare `( … & )` leaves
-# the child in the hook's process group, where the teardown signal can
-# reap it mid-run (macOS ships no `setsid`, so the detach is done in-binary).
-# The outer `( … & )` keeps the brief spawn-detached launch off SessionEnd's
-# critical path; stderr is tee'd to a data-dir log so a silent prefetch
-# failure — asset missing, disk full, arch mismatch — leaves a forensic
-# trail. The orchestrator additionally records PREFETCH_FAILED /
-# PREFETCH_DEFERRED rows in events_log for /health and `update status`.
+# Shared log dir for the dashboard reaps below. Two former blocks are gone: the
+# detached `update prefetch` child (ADR 0051 moved skew prefetch to SessionStart)
+# and the cache-binary reap + consolidate spawn. The Go `hook session-end` verb
+# now owns the cache-binary reap (ReapPluginCacheBinaries) and enqueues a single
+# detached `session finalize` child that runs the intelligence chain — including
+# consolidation — in-process, so no consolidate spawn is needed here.
 LOG_DIR="${CLAUDE_PLUGIN_DATA:-/tmp}/data/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-# SC2094: `--log` (the detached child's stdout+stderr) and `2>>` (the launcher's
-# own Warn output) both APPEND to update.err from distinct processes — no read,
-# no truncation, so the read/write collision the rule guards against cannot occur.
-# shellcheck disable=SC2094
-("$ANTON_BIN" hook spawn-detached --log "$LOG_DIR/update.err" -- "$ANTON_BIN" update prefetch --quiet --budget 60s 1>/dev/null 2>>"$LOG_DIR/update.err" &)
 
 # Best-effort: reap a session-scoped dashboard server on the default port.
 # LISTEN-filtered (a bare port query also matches established browser
@@ -65,64 +56,5 @@ if command -v pgrep >/dev/null 2>&1; then
         fi
     done
 fi
-
-# Best-effort: reap orphaned data/bin subdirs left in superseded Claude Code
-# plugin-cache version dirs. Proceeds ONLY when CLAUDE_PLUGIN_ROOT sits inside
-# the CC plugin cache (…/plugins/cache/anton-core/…); dev checkouts and data
-# dirs are never swept. Only the data/bin subdir is removed — CC owns the
-# version-dir envelope and the current version is never touched. Concurrent
-# session-ends double-reap harmlessly: rm -rf on an already-gone dir is a
-# no-op under || true, and the [ -d ] guard turns the second pass into a clean
-# skip.
-#
-# Path-confinement: the case globs match the LITERAL path, which a `..`-laden
-# CLAUDE_PLUGIN_ROOT or a symlinked version-dir/data component could point out
-# of the cache subtree while still reading …/plugins/cache/anton-core/…. So the
-# delete is gated on the CANONICAL path: `cd … && pwd -P` (bash 3.2 has no
-# realpath) resolves `..` and symlinked intermediates, and an escaped target no
-# longer matches the anton-core glob, so it is skipped. A root carrying a `..`
-# path component is also refused outright up front. The final `bin` is
-# re-appended unresolved so a symlinked bin is unlinked by rm, never followed.
-# Guarded by scripts/lib/wrapper_test/session_end_cache_reap.bats.
-case "$CLAUDE_PLUGIN_ROOT" in
-    */plugins/cache/anton-core/*)
-        # Refuse to reap from a root with a `..` component (slash-bounded so a
-        # literal `foo..bar` dir name is not mistaken for traversal).
-        case "/$CLAUDE_PLUGIN_ROOT/" in
-            */../*) : ;;
-            *)
-                _cache_root="$(dirname "$CLAUDE_PLUGIN_ROOT")" || true
-                _cur="$(basename "$CLAUDE_PLUGIN_ROOT")" || true
-                for d in "$_cache_root"/*/data/bin; do
-                    [ -d "$d" ] || continue
-                    ver="$(basename "${d%/data/bin}")" || true
-                    [ "$ver" != "$_cur" ] || continue
-                    # Canonicalise the parent before deleting; re-append the
-                    # unresolved `bin` (a symlinked bin is then unlinked, not
-                    # followed). cd failure → skip (best-effort).
-                    _real="$(cd "${d%/bin}" 2>/dev/null && pwd -P)" || continue
-                    case "$_real/bin" in
-                        */plugins/cache/anton-core/*)
-                            rm -rf "$d" 2>/dev/null || true
-                            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) reaped cache binary dir $d (ver=$ver cur=$_cur root=$CLAUDE_PLUGIN_ROOT)" >>"$LOG_DIR/cache-reap.log" 2>/dev/null || true
-                            ;;
-                    esac
-                done
-                ;;
-        esac
-        ;;
-esac
-
-# Best-effort: fire a consolidation pass (Link always; Dream/RunAll on their
-# own cooldowns). Routed through `hook spawn-detached` so the LLM pass runs
-# in its own session (Setsid) and survives SessionEnd teardown rather than
-# being reaped with the hook's process group; --quiet so it never blocks.
-# The maintenance file-lock serializes against any concurrent consolidate,
-# and stderr is appended to a data-dir log so a silent failure leaves a trail.
-# SC2094: `--log` (the detached child's stdout+stderr) and `2>>` (the launcher's
-# own Warn output) both APPEND to consolidate.err from distinct processes — no
-# read, no truncation, so the rule's read/write collision cannot occur.
-# shellcheck disable=SC2094
-("$ANTON_BIN" hook spawn-detached --log "$LOG_DIR/consolidate.err" -- "$ANTON_BIN" maintenance consolidate --quiet 1>/dev/null 2>>"$LOG_DIR/consolidate.err" &)
 
 exec "$ANTON_BIN" hook session-end "$@"

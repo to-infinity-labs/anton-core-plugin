@@ -17,10 +17,10 @@ Enumerates every directed path from `A` to `B` across the code-graph up to a dep
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query paths-between --from-id <A> --to-id <B> --rel-types CALLS --max-depth N --max-paths K [--shortest] [--exclude-ambiguous]
+"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query paths-between --from-id <A> --to-id <B> --rel-types CALLS --max-depth N --max-paths K [--shortest] [--exclude-ambiguous] [--repo <slug>]
 ```
 
-Resolve `<A>` and `<B>` independently via the [recall](../recall/SKILL.md) skill unless each already looks like a symbol-id. `--rel-types` accepts a comma-separated list or a JSON array literal; malformed JSON surfaces as a parser error at the CLI rather than at the SQL layer.
+Resolve `<A>` and `<B>` independently via the [recall](../recall/SKILL.md) skill unless each already looks like a symbol-id. `--rel-types` accepts a comma-separated list or a JSON array literal; malformed JSON surfaces as a parser error at the CLI rather than at the SQL layer. From a cwd that is not the registered checkout (a superset worktree), pass `--repo <slug>` to walk the registered repo's graph instead of the cwd's (empty) store.
 
 ## Output
 

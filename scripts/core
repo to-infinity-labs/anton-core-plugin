@@ -70,8 +70,9 @@ export ANTON_DATA_DIR_AUTHORITATIVE
 # root from ~/.anton-core/config.json (the documented operator-config tier)
 # BEFORE the cache default below, so binary location matches the data root the
 # binary itself would resolve. Setting CORE_DATA_DIR is load-bearing: it pins
-# the binary's resolver to step 1 and skips the dev-mode ./data probe, which
-# would otherwise mis-resolve when setup runs from a cwd containing ./data.
+# the binary's resolver to step 1 and skips the dev-mode ./data probe (itself
+# gated behind CORE_DEV_MODE), which would otherwise mis-resolve when setup
+# runs from a cwd containing ./data.
 _data_root_source="authoritative"
 if [[ "$ANTON_DATA_DIR_AUTHORITATIVE" == "no" ]] && [[ -z "${CLAUDE_PLUGIN_DATA+x}" ]]; then
     # Read the operator-config data root inline. wrapper.sh is not sourced yet
@@ -128,15 +129,54 @@ if [[ "${1:-}" == "--wrapper-check" ]]; then
             "$CLAUDE_PLUGIN_ROOT" >&2
         exit 2
     fi
-    bin_path="$CLAUDE_PLUGIN_DATA/data/bin/anton-core-v${version}"
+    # Pin-based binary resolution, mirroring scripts/lib/wrapper.sh (ADR 0051 —
+    # hooks answer or enqueue). scripts/core NEVER fetches; this diagnostic
+    # reports the LIVE resolution so it cannot lie about which binary a
+    # `core <verb>` would exec. Precedence (same as wrapper.sh):
+    #   (1) the pin at data/state/installed-version → data/versions/v<ver>/anton-core;
+    #   (2) a repo-local dev build (bin/anton-core);
+    #   (3) a staged-but-not-rotated slot named by staged-update.json.
+    # The legacy data/bin/anton-core-v${version} layout is gone with the
+    # bootstrap deletion; resolving off it here would report a phantom path.
+    pin_file="$CLAUDE_PLUGIN_DATA/data/state/installed-version"
+    bin_path=""
+    if [[ -f "$pin_file" ]]; then
+        installed_version="$(head -1 "$pin_file" 2>/dev/null || true)"
+        installed_version="${installed_version#v}"
+        installed_version="${installed_version//$'\n'/}"
+        bin_path="$CLAUDE_PLUGIN_DATA/data/versions/v${installed_version}/anton-core"
+    fi
+    if [[ ! -x "$bin_path" ]] && [[ -x "$CLAUDE_PLUGIN_ROOT/bin/anton-core" ]]; then
+        bin_path="$CLAUDE_PLUGIN_ROOT/bin/anton-core"
+    fi
+    staged_state="$CLAUDE_PLUGIN_DATA/data/state/staged-update.json"
+    if [[ ! -x "$bin_path" ]] && [[ -f "$staged_state" ]]; then
+        if command -v jq >/dev/null 2>&1; then
+            staged_bin="$(jq -r '.binary_path // empty' "$staged_state" 2>/dev/null || true)"
+        else
+            staged_bin="$(grep -E '"binary_path"[[:space:]]*:[[:space:]]*"[^"]+"' "$staged_state" 2>/dev/null \
+                | head -1 \
+                | sed -E 's/.*"binary_path"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+                || true)"
+        fi
+        if [[ -n "$staged_bin" ]]; then
+            # binary_path is written relative to the data dir; tolerate absolute.
+            case "$staged_bin" in
+                /*) : ;;
+                *)  staged_bin="$CLAUDE_PLUGIN_DATA/$staged_bin" ;;
+            esac
+            bin_path="$staged_bin"
+        fi
+    fi
     if [[ -x "$bin_path" ]]; then
         bin_exists=true
     else
         bin_exists=false
     fi
-    # Report whether the resolved binary path lives inside a Claude-Code-managed
-    # cache/marketplace clone — the same condition that Task 1's refuse-guard
-    # fires on in wrapper.sh. bash 3.2 case glob; no realpath.
+    # Report whether the resolved live binary path sits inside a
+    # Claude-Code-managed cache/marketplace clone (bootstrap-fetch.sh's
+    # install-refusal condition). bash 3.2 case glob; no realpath. An empty
+    # bin_path (nothing resolved) matches no cache glob → false.
     case "$bin_path" in
         */plugins/cache/*|*/plugins/marketplaces/*) bin_in_managed_cache=true ;;
         *) bin_in_managed_cache=false ;;
@@ -245,26 +285,19 @@ if ! source "$_script_dir/lib/wrapper.sh" 2>"$_wrapper_src_err"; then
 fi
 rm -f "$_wrapper_src_err"
 
-# Surface bootstrap failure as a skill-shape envelope on stderr +
-# non-zero exit. wrapper.sh writes a hook-shape precondition envelope
-# to stdout and exits 0 (non-blocking hooks contract). Skills cannot
-# consume that shape on stdout -- they would treat it as data. The
-# shim intercepts the failure here and re-emits a skill-shape error,
-# then exits 2 so callers (skill bodies, operator shells) get a real
-# non-zero status.
-if [[ -n "${BOOTSTRAP_FAIL_REASON:-}" ]]; then
-    _detail_esc=""
-    case "$BOOTSTRAP_FAIL_REASON" in
-        bin_dir_in_managed_cache)
-            _detail_esc="binary resolved into the Claude Code plugin cache/marketplace clone; run anton-core via ~/.local/bin/core (core-shim.sh), not the bundled scripts/core"
-            ;;
-        *)
-            _detail_esc="anton-core binary unavailable; run /anton-core:setup or check network connectivity"
-            ;;
-    esac
-    printf '{"status":"error","error":{"kind":"precondition_missing","reason":"%s","detail":"%s"}}\n' \
-        "$BOOTSTRAP_FAIL_REASON" "$_detail_esc" >&2
+# Missing-binary precondition. The sourced wrapper (ADR 0051 — hooks answer or
+# enqueue) resolves the pin / dev build / staged slot but NEVER fetches; it
+# defers the print via ANTON_DEFER_BOOTSTRAP_ERROR so this shim owns the
+# skill-shape envelope. When nothing resolved to an executable binary, emit the
+# precondition envelope on stderr (skills treat stdout as data, so the error
+# must go to stderr) and exit 2 — a real non-zero status for skill bodies and
+# operator shells. Installing the binary is /anton-core:setup's job (via
+# scripts/lib/bootstrap-fetch.sh), never this shim's; scripts/core stays
+# curl-free by contract.
+if [[ ! -x "${ANTON_BIN:-}" ]]; then
+    printf '{"status":"error","error":{"kind":"precondition_missing","reason":"binary_missing_run_setup","detail":"anton-core binary not found; run /anton-core:setup to install it."}}\n' >&2
     exit 2
 fi
 
+# Reached only when ANTON_BIN is an executable binary (guarded above).
 exec "$ANTON_BIN" "$@"

@@ -1,5 +1,5 @@
 ---
-fragment-version: 1.3.0
+fragment-version: 1.4.0
 ---
 
 # Anton Core
@@ -94,6 +94,6 @@ The tools you reach for while working. Memory and Code Graph are agent-primary �
 ## Conventions
 
 - **IDs**: prefixed — `conv-*`, `ref-*`, `task-*`
-- **Naming**: internal files use "core"; "Anton" only in CLAUDE.md
+- **Naming**: internal files use "core"; "Anton" only in CLAUDE.md — plus the one model-facing exception, the `anton` command
 - **Dates**: verify today's date from env before creating date-based filenames
-- **Binary invocation**: skill bodies invoke the binary as `"${CLAUDE_PLUGIN_ROOT}/scripts/core" <verb>` — the shim handles bootstrap, path resolution, and the data-dir env-var translation. Bare `core <verb>` in skill prose documents the operator-facing shell command, available via the optional `~/.local/bin/core` symlink that `/anton-core:setup` creates. Never invoke a bare `core` from a skill body — it isn't on `$PATH` in subagent contexts.
+- **Binary invocation**: skill bodies invoke the binary as `anton <verb>` — the plugin's `bin/anton` launcher, which Claude Code puts on the Bash tool's `PATH` (in main-session and subagent shells alike) whenever the plugin is enabled, and which execs `scripts/core` so the shim keeps handling pin resolution, precondition envelopes, and the data-dir env-var translation. Bare `core <verb>` in skill prose documents the operator-facing shell command, available via the optional `~/.local/bin/core` symlink that `/anton-core:setup` creates. Never invoke a bare `core` from a skill body — it is the operator launcher and bypasses the shim's pin gate.

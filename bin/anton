@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Model-facing bare command for anton-core. Claude Code appends every enabled
+# plugin's bin/ directory to the Bash tool's PATH, so skill bodies invoke
+# `anton <noun> <verb>` instead of the full versioned cache path
+# "${CLAUDE_PLUGIN_ROOT}/scripts/core". This launcher is a pure pass-through
+# to scripts/core — the full shim (pin resolution, precondition envelopes,
+# data-dir env translation) stays the single behavior owner.
+#
+# NOT to be confused with its two siblings:
+#   bin/anton-core — the dev-build BINARY slot (make build output; wrapper.sh
+#                    and scripts/core resolve it as the binary itself). A
+#                    launcher there would exec back into scripts/core forever.
+#   core           — the operator-shell launcher (~/.local/bin/core →
+#                    <data>/data/bin/core), which execs the live
+#                    data/versions/current binary directly.
+#
+# Symlink-safe: resolves $0 via a readlink loop (macOS has no `readlink -f`);
+# the hop cap kills a cyclic-symlink hang. bash-3.2 clean (macOS /bin/bash).
+set -euo pipefail
+
+_script_path="$0"
+_link_hops=0
+while [[ -L "$_script_path" ]]; do
+    _link_hops=$((_link_hops + 1))
+    if [[ $_link_hops -gt 40 ]]; then
+        printf 'anton: more than 40 symlink hops resolving %s — refusing to continue; check %s and ancestors for a cyclic symlink\n' \
+            "$0" "$0" >&2
+        exit 2
+    fi
+    if ! _target="$(readlink "$_script_path" 2>&1)"; then
+        printf 'anton: readlink failed on %s: %s; check link permissions and target existence\n' \
+            "$_script_path" "$_target" >&2
+        exit 2
+    fi
+    case "$_target" in
+        /*) _script_path="$_target" ;;
+        *)  _script_path="$(cd "$(dirname "$_script_path")" && cd "$(dirname "$_target")" && pwd)/$(basename "$_target")" ;;
+    esac
+done
+_script_dir="$(cd "$(dirname "$_script_path")" && pwd)"
+
+_shim="$_script_dir/../scripts/core"
+if [[ ! -x "$_shim" ]]; then
+    printf 'anton: shim not found at %s — the plugin package is incomplete; reinstall the plugin or run /anton-core:setup\n' \
+        "$_shim" >&2
+    exit 2
+fi
+
+exec "$_shim" "$@"

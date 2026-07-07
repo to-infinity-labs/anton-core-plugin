@@ -17,9 +17,9 @@ Operator-facing review queue for improvement suggestions emitted by the deep-ana
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" improvement list [--pending-only] [--applied-only] [--limit N] [--since <epoch-ms|ISO-8601>]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" improvement approve --id <imp-id>
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" improvement dismiss --id <imp-id>
+anton improvement list [--pending-only] [--applied-only] [--limit N] [--since <epoch-ms|ISO-8601>]
+anton improvement approve --id <imp-id>
+anton improvement dismiss --id <imp-id>
 ```
 
 The review queue defaults to pending entries (`--pending-only`); `--applied-only` surfaces the adopted set, and bare `improvement list` (no filter) returns both. `--since` restricts the list to rows created at or after a timestamp (epoch-ms or ISO 8601). `approve` flips `applied` from `0` to `1` and may optionally offer to execute the `action_taken` description — execution always requires explicit operator confirmation. `dismiss` deletes the sidecar row outright; the parent `items` row is preserved.

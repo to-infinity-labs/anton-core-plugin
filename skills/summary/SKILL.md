@@ -17,7 +17,7 @@ Morning-briefing surface. Produces one overview of open tasks, the overdue and d
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" report summary [--date <YYYY-MM-DD>] [--period daily|weekly]
+anton report summary [--date <YYYY-MM-DD>] [--period daily|weekly]
 ```
 
 Default anchors on today's UTC date with the `daily` period (one-day `completed_recent` window); `--period weekly` widens that window to seven days. The verb is read-only — rendering and any operator-facing markdown belong to downstream skills.

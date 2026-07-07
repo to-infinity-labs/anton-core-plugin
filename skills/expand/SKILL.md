@@ -17,7 +17,7 @@ Fetches full content for one or more memory items by id. Multi-id calls also ups
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" item get --ids <id1>,<id2>[,...] [--session-id <sid>] [--include-relationships] [--no-bump]
+anton item get --ids <id1>,<id2>[,...] [--session-id <sid>] [--include-relationships] [--no-bump]
 ```
 
 The skill's user-facing surface is `expand`; the underlying cobra verb is `get`. An operator typing the verb directly should use `get`. The skill itself routes through `get` transparently and applies the batch cap from `tools.expand_batch_cap`.

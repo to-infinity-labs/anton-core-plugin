@@ -17,7 +17,7 @@ Runs a fused search over the unified store — vector KNN, dual FTS across title
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" memory recall [--query <text>] [--code] [--include-tests] [--docs] [--all] [--repo <slug>] [--on-error] [--include-types t1,t2] [--type T]... [--tag T]... [--recent] [--include-completed] [--limit N] [--explain] [--no-bump] [--session-id <sid>] [--format json|text]
+anton memory recall [--query <text>] [--code] [--include-tests] [--docs] [--all] [--repo <slug>] [--on-error] [--include-types t1,t2] [--type T]... [--tag T]... [--recent] [--include-completed] [--limit N] [--explain] [--no-bump] [--session-id <sid>] [--format json|text]
 ```
 
 At least one of `--query`, `--type`, or `--tag` is required. `--type` and `--tag` are repeatable; `--include-types` is comma-separated. `--code` is shorthand for `--include-types Symbol,Module`: a `--type`/`--include-types` list naming only code types routes to the per-repo code store (scoped to the named subset), while a list mixing knowledge and code types is rejected — use `--all` for a cross-store search. `--docs` targets the per-repo document store; `--all` fuses memory, repo docs, and repo code via weighted RRF; `--on-error` treats `--query` as error text and boosts RESOLVES-linked fixes to the top. `--repo <slug>` (valid only with `--code`/`--docs`/`--all`) scopes the per-repo store reads to a registered repo instead of the cwd's — use it whenever the session runs outside the registered checkout (a superset worktree), where the cwd's own store is empty.

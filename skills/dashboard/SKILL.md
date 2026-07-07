@@ -29,7 +29,7 @@ Default port is 7777. Honour an explicit operator port ("on port 8080") everywhe
 2. **Start** (probe failed — nothing listening, or the listener doesn't serve `/healthz`): run with the Bash tool and `run_in_background: true`:
 
    ```
-   "${CLAUDE_PLUGIN_ROOT}/scripts/core" dashboard --port $PORT <surface>
+   anton dashboard --port $PORT <surface>
    ```
 
    Do NOT detach — no `nohup`, no `disown`, no `setsid`. Session-scoped lifetime is the design: the server binds 127.0.0.1 only, opens the browser itself, and is torn down with this session's background tasks.

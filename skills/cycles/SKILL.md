@@ -17,7 +17,7 @@ Finds simple directed cycles in the code-graph. Each cycle is reported once (rot
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query cycle-detect [--containing <X>] --rel-types CALLS --max-cycles K --max-cycle-len N [--exclude-ambiguous] [--repo <slug>]
+anton graph query cycle-detect [--containing <X>] --rel-types CALLS --max-cycles K --max-cycle-len N [--exclude-ambiguous] [--repo <slug>]
 ```
 
 When `--containing <X>` is supplied, resolve `X` via the [recall](../recall/SKILL.md) skill first. All-mode seeds only `function | method | component` items; for `EXTENDS`/`IMPLEMENTS` cycles, pass `--containing <Class>` plus `--rel-types EXTENDS,IMPLEMENTS`. From a cwd that is not the registered checkout (a superset worktree), pass `--repo <slug>` to detect cycles in the registered repo's graph instead of the cwd's (empty) store.

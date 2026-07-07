@@ -17,7 +17,7 @@ Read-only diagnostic surface. Composes per-subsystem panels (memory invariants, 
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" report health [--full] [--trend]
+anton report health [--full] [--trend]
 ```
 
 Default invocation returns the roll-up only: overall `severity`, the per-subsystem `checks` array (each carrying a remediation hint when not healthy), and a one-line `summary`. `--full` adds the `counts`, `memory`, `remediation`, and `system` breakdown panels; `--trend` adds the ten-row trend rollup from `events.health_log` classifying each panel as Improving / Stable / Degrading.

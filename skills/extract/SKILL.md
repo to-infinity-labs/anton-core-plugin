@@ -17,7 +17,7 @@ Analyses content — pasted text, file path, or content already saved by another
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" item extract [--source-path <file>] [--source-ref <ref>] [--operator <name>] [--tasks-only] [--pipeline] [--metadata-only] [--output json|yaml]
+anton item extract [--source-path <file>] [--source-ref <ref>] [--operator <name>] [--tasks-only] [--pipeline] [--metadata-only] [--output json|yaml]
 ```
 
 Standalone mode reads from `--source-path` (or stdin) and emits the structured envelope. Pipeline mode (`--pipeline`) emits the relationships array so downstream stages of an intake chain can consume them silently. `--operator` overrides the configured owner for the action-item filter.

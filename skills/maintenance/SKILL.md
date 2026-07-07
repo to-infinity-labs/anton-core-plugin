@@ -17,15 +17,15 @@ Foreground entry point to the same handlers the `session-end` hook backgrounds. 
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance run [--dry-run] [--force] [--continue-on-error]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance consolidate [--dry-run] [--force] [--quiet]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance dedup --target tasks
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance purge --target {stale|legacy-stubs}
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance prune --target orphans
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance retry --target extraction
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance reset --target access-log
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance reindex --target {knowledge|code}
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" maintenance status [--history Nd]
+anton maintenance run [--dry-run] [--force] [--continue-on-error]
+anton maintenance consolidate [--dry-run] [--force] [--quiet]
+anton maintenance dedup --target tasks
+anton maintenance purge --target {stale|legacy-stubs}
+anton maintenance prune --target orphans
+anton maintenance retry --target extraction
+anton maintenance reset --target access-log
+anton maintenance reindex --target {knowledge|code}
+anton maintenance status [--history Nd]
 ```
 
 The eight write verbs (`run`, `consolidate`, `dedup`, `purge`, `prune`, `retry`, `reset`, `reindex`) acquire the maintenance lock before doing work; the read-only `status` verb does not. Lock contention surfaces (exit 4) as `{"error":{"kind":"concurrent_run","detail":"lock held: <path>","path":"<path>"}}`. An unknown `--target` value is rejected before the lock is taken: `{"error":{"kind":"bad_input","verb":"<verb>","offending_value":"<value>","accepted_set":[...],"detail":"bad input for verb <verb>: <value> (accepted: ...)"}}`. Both are wrapped under `error` — there is no top-level `status:"error"` form.

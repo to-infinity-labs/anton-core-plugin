@@ -17,7 +17,7 @@ Walks the relationship graph outward from one seed item and returns every node a
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" memory explore --seed-id <id> [--depth N] [--rel-types T1,T2] [--direction {out,in,both}] [--include-content]
+anton memory explore --seed-id <id> [--depth N] [--rel-types T1,T2] [--direction {out,in,both}] [--include-content]
 ```
 
 ## Output

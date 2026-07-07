@@ -17,14 +17,14 @@ Single operator surface for `Task`-typed items — list pending work, add new to
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" task add --title "..." [--priority high|medium|low] [--due <YYYY-MM-DD>] [--reminder <ts>] [--tag <name> ...] [--owner <name>] [--source-ref <id>] [--notes "..."]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" task list [--status pending|in_progress|completed] [--owner <name>] [--due-before <date>] [--due-on <date>] [--limit N] [--ids-only]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" task due [--mode overdue|today|soon|nudge-overdue|nudge-soon|reminders] [--owner <name>] [--limit N]
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" task complete --id <task-id>
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" task update --id <task-id> [--title ...] [--status ...] [--priority ...] [--due ...] [--reminder ...] [--owner ...] [--notes ...]
+anton task add --title "..." [--priority high|medium|low] [--due <YYYY-MM-DD>] [--reminder <ts>] [--tag <name> ...] [--owner <name>] [--source-ref <id>] [--notes "..."]
+anton task list [--status pending|in_progress|completed] [--owner <name>] [--due-before <date>] [--due-on <date>] [--limit N] [--ids-only]
+anton task due [--mode overdue|today|soon|nudge-overdue|nudge-soon|reminders] [--owner <name>] [--limit N]
+anton task complete --id <task-id>
+anton task update --id <task-id> [--title ...] [--status ...] [--priority ...] [--due ...] [--reminder ...] [--owner ...] [--notes ...]
 ```
 
-The skill resolves natural-language dates ("tomorrow", "next monday", "in 3 days") before invoking the CLI; the handlers accept only ISO 8601 date strings. Default owner is read from `config.owner` via `"${CLAUDE_PLUGIN_ROOT}/scripts/core" config get --key owner`.
+The skill resolves natural-language dates ("tomorrow", "next monday", "in 3 days") before invoking the CLI; the handlers accept only ISO 8601 date strings. Default owner is read from `config.owner` via `anton config get --key owner`.
 
 ## Output
 

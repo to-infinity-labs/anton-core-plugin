@@ -17,7 +17,7 @@ Surfaces the blast radius of changing a symbol by walking inbound dependents acr
 ## How
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query transitive-walk --seed-id <id> --direction in --rel-types CALLS,EXTENDS,IMPLEMENTS,REFERENCES,RENDERS --depth N [--exclude-ambiguous] [--repo <slug>]
+anton graph query transitive-walk --seed-id <id> --direction in --rel-types CALLS,EXTENDS,IMPLEMENTS,REFERENCES,RENDERS --depth N [--exclude-ambiguous] [--repo <slug>]
 ```
 
 Resolve `<symbol>` first via the [recall](../recall/SKILL.md) skill unless the input already looks like a symbol-id. With `--paths-to <Y>`, dispatch `paths-between X Y` with the same five-rel filter so the path walk does not silently drop non-`CALLS` chains. From a cwd that is not the registered checkout (a superset worktree), pass `--repo <slug>` to walk the registered repo's graph instead of the cwd's (empty) store.
@@ -27,7 +27,7 @@ Resolve `<symbol>` first via the [recall](../recall/SKILL.md) skill unless the i
 When the goal is "which complex callers will hurt most if X changes", rank instead of enumerate via the `dependents-by-complexity` template — same backward multi-rel walk, but filters `cyclomatic >= M` and sorts `cyclomatic DESC`:
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/core" graph query dependents-by-complexity --seed-id <id> \
+anton graph query dependents-by-complexity --seed-id <id> \
   --rel-types CALLS,EXTENDS,IMPLEMENTS,REFERENCES,RENDERS \
   --depth N --min-cyc M --top-n K [--exclude-ambiguous] [--repo <slug>]
 ```

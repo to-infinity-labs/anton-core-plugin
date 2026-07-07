@@ -19,6 +19,13 @@
 # release repo; no token / auth / URL-base / API-base env vars are consulted.
 # Assets are fetched by their stable releases/download/v<ver>/<asset> URLs.
 #
+# Root resolution: a caller-provided CLAUDE_PLUGIN_DATA is normalized (a
+# trailing /data segment is stripped, mirroring the Go resolver); when unset
+# and the plugin root is a Claude-Code cache path, the persistent root is
+# self-derived and — on a successful install — seeded into
+# ~/.anton-core/config.json (only when absent), so the rest of setup needs no
+# environment at all.
+#
 # Honors:
 #   ANTON_SKIP_BOOTSTRAP — non-empty disables the fetch entirely (hermetic
 #                          test hatch); exits non-zero with a clear reason.
@@ -33,9 +40,52 @@ set -euo pipefail
 # scripts/lib/bootstrap-fetch.sh, so ../.. is the repo/plugin root.
 _script_dir="$(cd "$(dirname "$0")" && pwd)"
 : "${CLAUDE_PLUGIN_ROOT:=$(cd "$_script_dir/../.." && pwd)}"
-# CLAUDE_PLUGIN_DATA is the persistent state root; fall back to PLUGIN_ROOT for
-# repo-local dev runs, matching scripts/lib/wrapper.sh's default.
-: "${CLAUDE_PLUGIN_DATA:=$CLAUDE_PLUGIN_ROOT}"
+
+# CLAUDE_PLUGIN_DATA is the persistent state root. Resolution, in order:
+#   1. Caller-provided env, NORMALIZED: a trailing `data` segment is stripped —
+#      the exact mirror of internal/db/paths.go::normalizeRoot, which the Go
+#      binary applies to CORE_DATA_DIR. Without this, a hand-assembled
+#      `<root>/data` value stages into `<root>/data/data/{versions,state}`
+#      while the binary reads `<root>/data/...` — the nested-tree failure that
+#      bricked the v2.1.0 field install.
+#   2. Self-derived from the plugin's own cache location: skills run in the
+#      Bash tool, where CLAUDE_PLUGIN_DATA is NOT in the environment (it is
+#      hook-only env), so when it is unset and CLAUDE_PLUGIN_ROOT matches the
+#      Claude-Code-managed shape */plugins/cache/<marketplace>/<plugin>/<ver>,
+#      the persistent root is <plugins-dir>/data/<marketplace>-<plugin> (the
+#      Claude Code plugin-data convention). The marketplace-clone shape
+#      (*/plugins/marketplaces/*) is deliberately NOT derived — it has no
+#      version segment and setup never sees it; it falls through to the
+#      managed-cache refusal below.
+#   3. Repo/plugin-root fallback for repo-local dev runs, matching
+#      scripts/lib/wrapper.sh's default.
+_derived_root="false"
+if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+    if [[ "$(basename "$CLAUDE_PLUGIN_DATA")" == "data" ]]; then
+        CLAUDE_PLUGIN_DATA="$(dirname "$CLAUDE_PLUGIN_DATA")"
+    fi
+else
+    case "$CLAUDE_PLUGIN_ROOT" in
+        */plugins/cache/*/*/*)
+            _plugins_dir="${CLAUDE_PLUGIN_ROOT%/cache/*}"
+            _cache_rel="${CLAUDE_PLUGIN_ROOT#*/plugins/cache/}"
+            _mkt="${_cache_rel%%/*}"
+            _rest="${_cache_rel#*/}"
+            _plugin="${_rest%%/*}"
+            if [[ -n "$_mkt" && -n "$_plugin" ]]; then
+                CLAUDE_PLUGIN_DATA="${_plugins_dir}/data/${_mkt}-${_plugin}"
+                _derived_root="true"
+                printf 'bootstrap-fetch: derived persistent data root %s from the plugin cache location\n' \
+                    "$CLAUDE_PLUGIN_DATA"
+            else
+                CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_ROOT"
+            fi
+            ;;
+        *)
+            CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_ROOT"
+            ;;
+    esac
+fi
 export CLAUDE_PLUGIN_ROOT CLAUDE_PLUGIN_DATA
 
 _repo_slug="to-infinity-labs/anton-core-plugin"
@@ -165,7 +215,7 @@ _versions_root="${CLAUDE_PLUGIN_DATA}/data/versions"
 case "$_versions_root" in
     */plugins/cache/*|*/plugins/marketplaces/*)
         _fail "install_dir_in_managed_cache" \
-            "refusing to install into the Claude Code plugin cache/marketplace clone ($_versions_root); point CLAUDE_PLUGIN_DATA at a persistent data root (run /anton-core:setup)"
+            "refusing to install into the Claude Code plugin cache/marketplace clone ($_versions_root) — that location is wiped on plugin updates, and the persistent data root could not be determined from this plugin-root shape"
         ;;
 esac
 
@@ -340,6 +390,41 @@ if ! mv "$staged_tmp" "${state_dir}/staged-update.json" 2>/dev/null; then
     rm -f "$staged_tmp" 2>/dev/null || true
     _fail "staged_write_failed" \
         "installed the binary but failed to write ${state_dir}/staged-update.json"
+fi
+
+# ── Seed the operator config (self-derived root only, only-if-absent) ─────
+# When the root was self-derived (no env), persist it to
+# ~/.anton-core/config.json so every later binary call — `update
+# apply-if-staged`, `db init`, all of Stage 1+ — resolves the same root via
+# the operator-config step (internal/db/paths.go::ResolveRoot step 3, and
+# scripts/core's non-authoritative read) with NO environment at all. An
+# existing config is operator-owned and never touched; `core setup
+# persist-data-dir` remains the owner for all later updates. Deliberately
+# NOT seeded for caller-provided or dev-fallback roots — a repo checkout
+# must never become the operator's persistent data root. Best-effort: a
+# seed failure warns (setup's persist-data-dir step still covers it).
+if [[ "$_derived_root" == "true" && -n "${HOME:-}" ]]; then
+    _op_cfg_dir="${HOME}/.anton-core"
+    _op_cfg="${_op_cfg_dir}/config.json"
+    if [[ ! -e "$_op_cfg" ]]; then
+        _cfg_tmp="${_op_cfg_dir}/.config.json.tmp.$$"
+        _seed_ok="false"
+        if mkdir -p "$_op_cfg_dir" 2>/dev/null; then
+            if command -v jq >/dev/null 2>&1; then
+                jq -n --arg root "$CLAUDE_PLUGIN_DATA" '{data_root: $root}' > "$_cfg_tmp" 2>/dev/null && _seed_ok="true"
+            else
+                printf '{\n  "data_root": "%s"\n}\n' "$CLAUDE_PLUGIN_DATA" > "$_cfg_tmp" 2>/dev/null && _seed_ok="true"
+            fi
+        fi
+        if [[ "$_seed_ok" == "true" ]] \
+            && chmod 600 "$_cfg_tmp" 2>/dev/null \
+            && mv "$_cfg_tmp" "$_op_cfg" 2>/dev/null; then
+            printf 'bootstrap-fetch: seeded %s with data_root=%s\n' "$_op_cfg" "$CLAUDE_PLUGIN_DATA"
+        else
+            rm -f "$_cfg_tmp" 2>/dev/null || true
+            printf 'bootstrap-fetch: warning: could not seed %s; setup will persist the data root later\n' "$_op_cfg" >&2
+        fi
+    fi
 fi
 
 printf 'bootstrap-fetch: installed anton-core v%s (%s/%s) cosign_verified=%s\n' \

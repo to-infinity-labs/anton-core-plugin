@@ -22,6 +22,18 @@ State-aware installer and lifecycle surface for anton-core. On invocation it run
 - Operator prompts use `AskUserQuestion` (never stdin).
 - Voice: neutral, warm, concise — no persona.
 
+### Operator experience (apply throughout)
+
+The person installing this may not be technical. Everything they see follows these rules — no exceptions, at every step of every flow in this skill:
+
+- **Plain language only.** Never show the operator raw file paths, JSON envelopes, `reason=` tokens, exit codes, environment variables, or shell output. Those exist for you and for bug reports — not for narration. The numbered mechanics throughout this skill are **internal execution notes: never read them aloud**; the operator sees only stage banners, short progress phrases (a few words per step, e.g. "Downloading the assistant's engine… done"), and — on failure — the failure card below.
+- **Every failure renders a three-part card**, nothing else:
+  1. *What happened* — one plain sentence ("I couldn't download the assistant's engine.").
+  2. *What I'm doing about it* — the retry, fallback, or skip you are taking ("I'll retry once" / "I'm skipping this optional step and continuing").
+  3. *What you can do* — the single action left to the operator, which is usually "nothing". When the problem needs the developer, END the card with one copyable line — `report code: <reason token> — please send this to the developer` — and that line is the ONLY place a machine token may appear.
+- **Setup never delegates plumbing to the operator.** Never ask them to set environment variables, edit files, run diagnostic commands, visit GitHub, or file issues. If setup cannot proceed, say so in one sentence, produce the report line yourself, and stop cleanly.
+- **Optional means silent.** A failed optional step (shell access, telemetry lines, token lookup) gets at most one gentle sentence — or nothing — never a card.
+
 ### Paste-input normalization (every operator-pasted string)
 
 1. Strip leading/trailing whitespace (ASCII space, tab, `\r`, `\n`, `\v`, `\f`).
@@ -89,27 +101,27 @@ Match in order (first match wins):
 
 ### Step 3 — Stage 1: Foundation
 
-Print `1/4 Foundation`. Run, in order:
+Print `Step 1 of 4 — Foundation (getting the assistant's engine in place)`. The sub-steps below are internal execution notes (Operator experience contract applies). Run, in order:
 
 a. **Binary install (fresh box only).** When no binary resolves yet — no pin at `${CLAUDE_PLUGIN_DATA}/data/state/installed-version` with a matching `data/versions/v<ver>/anton-core`, and no staged binary — fetch and rotate it in:
-   1. `"${CLAUDE_PLUGIN_ROOT}/scripts/lib/bootstrap-fetch.sh"` — the setup-only synchronous fetch: it downloads + checksum/cosign-verifies the per-platform release binary, installs it at `data/versions/v<ver>/anton-core`, and writes `data/state/staged-update.json` (the prefetch record). Surface a **non-zero exit as a setup-blocked notice** naming the machine-parseable `reason=<…>` from its stderr — then stop (nothing downstream can run without a binary).
-   2. `anton update apply-if-staged` — rotates the just-staged slot to `data/versions/current` and writes the first pin (the ONLY pin writer). The wrapper's staged-slot fallback resolves the freshly-installed staged binary so `scripts/core` can run this. Surface a non-zero exit as a setup-blocked notice.
+   1. `CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" "${CLAUDE_PLUGIN_ROOT}/scripts/lib/bootstrap-fetch.sh"` — the setup-only synchronous fetch: it downloads + checksum/cosign-verifies the per-platform release binary, installs it at `data/versions/v<ver>/anton-core`, writes `data/state/staged-update.json` (the prefetch record), and on a fresh box seeds `~/.anton-core/config.json` with the data root. The env prefix is REQUIRED on every Stage-1 command: the Bash tool does not carry `CLAUDE_PLUGIN_DATA` (hook-only env), and shell state does not persist between Bash calls — the value above was substituted at skill load. (The script can also self-derive the root from its own cache location, so a missing prefix degrades gracefully — but never rely on that.) On a non-zero exit render the **failure card** (Operator experience contract): "I couldn't download the assistant's engine" / what you're doing about it / the `report code:` line carrying the machine-parseable `reason=<…>` from stderr — then stop (nothing downstream can run without a binary).
+   2. `CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" anton update apply-if-staged` — rotates the just-staged slot to `data/versions/current` and writes the first pin (the ONLY pin writer). The wrapper's staged-slot fallback resolves the freshly-installed staged binary so `scripts/core` can run this. A non-zero exit renders the failure card ("I couldn't finish installing the engine") and stops.
 
    **Idempotent:** skip both when a valid pin + binary already resolve (a re-run, repair, or hook-bootstrapped box). This step is a no-op on every non-fresh install.
-b. `anton db init` — materializes `core.db` + `events.db`, applies migrations, seeds DEFAULT_CONFIG (`INSERT OR IGNORE`). Idempotent. Surface a non-zero exit as a setup-blocked notice naming the precondition `reason`.
-c. `anton setup persist-data-dir` — records the resolved data root in `~/.anton-core/config.json`. Non-fatal: a failure is a one-line warning.
-d. `anton setup get-token --format json`. **Exit 0:** read the token from stderr (single line, no decoding) and prepend `ANTON_GITHUB_TOKEN=<token>` to every subsequent `anton` call in this run; never print it. **Exit 3:** proceed without a token — do not prompt for `gh auth login`, do not abort (the token only raises GitHub API rate limits).
+b. `CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" anton db init` — materializes `core.db` + `events.db`, applies migrations, seeds DEFAULT_CONFIG (`INSERT OR IGNORE`). Idempotent. A non-zero exit renders the failure card ("I couldn't set up the assistant's memory") with the precondition `reason` on the report-code line, and stops.
+c. `CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" anton setup persist-data-dir` — records the resolved data root in `~/.anton-core/config.json` (a no-op when the bootstrap fetch already seeded it). Non-fatal: a failure is a one-line warning.
+d. `CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" anton setup get-token --format json`. **Exit 0:** read the token from stderr (single line, no decoding) and prepend `ANTON_GITHUB_TOKEN=<token>` to every subsequent `anton` call in this run; never print it. **Exit 3:** proceed without a token — do not prompt for `gh auth login`, do not abort (the token only raises GitHub API rate limits).
 e. **Deferred classification telemetry (fresh only).** When the probe classified **fresh** (so `events.db` did not exist at Step 1), record the now-deferrable line — `anton event log --source setup --severity info --type SETUP_CLASSIFIED --subject fresh --detail "provenance=<truly-fresh|hook-bootstrapped>"` (use `hook-bootstrapped` when `core.db` already existed at Step 1, else `truly-fresh`). A failed `event log` is a one-line warning.
 
 ### Step 4 — Stage 2: Connect to Claude
 
-Print `2/4 Connect to Claude`.
+Print `Step 2 of 4 — Connect to Claude (wiring the assistant into your instructions)`.
 
-a. `anton fragment apply` — applies the shipped routing fragment into `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md` between the `<!-- anton-core:start -->` / `<!-- anton-core:end -->` sentinels (replace-in-place when present, append when absent), then pins `fragment.version` with a read-back verify gate (all inside the verb). Surface a non-zero exit as a setup-blocked notice naming the `io_error` detail; on success note `old_version → new_version` from the envelope.
+a. `anton fragment apply` — applies the shipped routing fragment into `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md` between the `<!-- anton-core:start -->` / `<!-- anton-core:end -->` sentinels (replace-in-place when present, append when absent), then pins `fragment.version` with a read-back verify gate (all inside the verb). A non-zero exit renders the failure card ("I couldn't connect the assistant to your Claude instructions") with the `io_error` detail on the report-code line, and stops; on success print one friendly line (the envelope's `old_version → new_version` is internal).
 
 ### Step 5 — Stage 3: Shell access (optional)
 
-Print `3/4 Shell access`. The whole stage is convenience; any failure is a one-line warning, then continue.
+Print `Step 3 of 4 — Shell access (optional: the "core" command for your terminal)`. The whole stage is convenience; per the Operator experience contract, any failure here gets at most one gentle sentence, then continue.
 
 a. `anton update status >/dev/null 2>&1` to materialize `data/versions/current` (read-only; runs the one-shot legacy→versioned migration). Confirm `[ -L "${CLAUDE_PLUGIN_DATA}/data/versions/current" ]`; if absent, warn and continue.
 b. `mkdir -p "${CLAUDE_PLUGIN_DATA}/data/bin"`. When `${CLAUDE_PLUGIN_DATA}/data/bin/core` is absent or `! cmp -s "${CLAUDE_PLUGIN_ROOT}/scripts/core-shim.sh" "${CLAUDE_PLUGIN_DATA}/data/bin/core"`, copy `scripts/core-shim.sh` into place and `chmod +x`. On `mkdir`/`cp` failure, warn and skip the rest of the stage.
@@ -117,7 +129,7 @@ c. `mkdir -p "$HOME/.local/bin"`, then point `${HOME}/.local/bin/core` → `${CL
 
 ### Step 6 — Stage 4: Your content (onboarding)
 
-Print `4/4 Your content`. Run `anton onboarding check`; if `shown: true` and `--re-onboard` was not present, skip to Step 7. Otherwise run **Onboarding**.
+Print `Step 4 of 4 — Your content (repositories and knowledge, all optional)`. Run `anton onboarding check`; if `shown: true` and `--re-onboard` was not present, skip to Step 7. Otherwise run **Onboarding**.
 
 ### Step 7 — Health verify + completion card
 

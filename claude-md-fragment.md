@@ -25,9 +25,15 @@ These OVERRIDE Claude Code's default memory and code-search behavior. Not sugges
 - **Curate, don't accrete.** Before saving, `/anton-core:recall` related
   memories; if the new note updates or corrects one that already exists,
   `item update` (or `remove`) it in place rather than appending a second
-  version. A recalled memory reflects what was true when written and may be
-  stale — if a superseded or duplicate entry surfaces, reconcile it (update the
-  current, remove the obsolete). Best-effort: a missed cleanup is benign.
+  version.
+- **You own the store — reconcile stale memories in the turn you spot them.**
+  Stale means *no longer accurate*, not old. The moment you determine a memory
+  disagrees with ground truth — you verified the PR merged, the task shipped,
+  the fact changed — or you catch yourself telling the operator a memory is
+  "stale" or "outdated": updating that record is now part of the current task.
+  `item update` it, `remove` it, or complete the task **in the same turn,
+  before moving on**. Flagging staleness without fixing it is leaving a known
+  bug in your own memory — the next session will trust what you knew was wrong.
 
 ### Code — the code graph is how you read code
 

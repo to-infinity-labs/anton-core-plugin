@@ -2,9 +2,10 @@
 # Model-facing bare command for anton-core. Claude Code appends every enabled
 # plugin's bin/ directory to the Bash tool's PATH, so skill bodies invoke
 # `anton <noun> <verb>` instead of the full versioned cache path
-# "${CLAUDE_PLUGIN_ROOT}/scripts/core". This launcher is a pure pass-through
-# to scripts/core — the full shim (pin resolution, precondition envelopes,
-# data-dir env translation) stays the single behavior owner.
+# "${CLAUDE_PLUGIN_ROOT}/scripts/core". This launcher is a pass-through with a
+# single bootstrap intercept to scripts/core — the full shim (pin resolution,
+# precondition envelopes, data-dir env translation) stays the single behavior
+# owner.
 #
 # NOT to be confused with its two siblings:
 #   bin/anton-core — the dev-build BINARY slot (make build output; wrapper.sh
@@ -38,6 +39,24 @@ while [[ -L "$_script_path" ]]; do
     esac
 done
 _script_dir="$(cd "$(dirname "$_script_path")" && pwd)"
+
+# `anton bootstrap` — the ONE exception to this launcher's never-fetches
+# contract (spec: one-name-zero-paths Part 2; ADR 0053). Intercepted here,
+# before the shim, and exec'd from this launcher's own plugin tree — never
+# from the data root. Every other argv passes through to scripts/core,
+# which still answers a missing binary with binary_missing_run_setup.
+# Unreachable from the operator shell by construction: ~/.local/bin/anton
+# targets the data-root binary launcher, not this file.
+if [[ "${1:-}" == "bootstrap" ]]; then
+    _fetch="$_script_dir/../scripts/lib/bootstrap-fetch.sh"
+    if [[ ! -x "$_fetch" ]]; then
+        printf 'anton: bootstrap-fetch script not found at %s — the plugin package is incomplete; reinstall the plugin\n' \
+            "$_fetch" >&2
+        exit 2
+    fi
+    shift
+    exec "$_fetch" "$@"
+fi
 
 _shim="$_script_dir/../scripts/core"
 if [[ ! -x "$_shim" ]]; then

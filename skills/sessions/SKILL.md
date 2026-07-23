@@ -27,7 +27,7 @@ anton session mark-reflected --session-id <session-id>
 
 ## Output
 
-Per-verb envelopes: `session list` returns `{"status":"ok","count":N,"sessions":[{"session_id":"...","headline":"...","started_at":<epoch-ms>,"duration_minutes":N,...}]}`, where each row carries `has_flags:1` only when the session raised flags — the field is omitted when it would be `0`; `session stats` returns `{"period_days":N,"sessions":N,"avg_duration_minutes":N,"avg_messages":N,"flagged_sessions":N,"top_tools":{...},"improvements":N}`; `session mark-reflected` stamps `reflected_at` on the matching row and returns the standard ADR-0010 success envelope. Contract: [docs/plugin-spec/05-cli-contract.md#session-list](../../docs/plugin-spec/05-cli-contract.md#session-list).
+Per-verb envelopes: `session list` returns `{"status":"ok","count":N,"sessions":[{"session_id":"...","headline":"...","started_at":<epoch-ms>,"duration_minutes":N,...}]}`, where each row carries `has_flags:1` only when the session raised flags — the field is omitted when it would be `0`; `session stats` returns `{"period_days":N,"sessions":N,"avg_duration_minutes":N,"avg_messages":N,"flagged_sessions":N,"top_tools":{...},"improvements":N,"token_total":N}` — `token_total` sums each session's main-transcript token buckets (input + output + cache read + cache creation; subagent spend lives in the token-usage ledger, surfaced by [usage](../usage/SKILL.md)); `session mark-reflected` stamps `reflected_at` on the matching row and returns the standard ADR-0010 success envelope. Contract: [docs/plugin-spec/05-cli-contract.md#session-list](../../docs/plugin-spec/05-cli-contract.md#session-list).
 
 ## See also
 

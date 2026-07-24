@@ -39,4 +39,4 @@ fi
 # first run, before setup Step 3b would otherwise write it. Best-effort.
 "$ANTON_BIN" setup persist-data-dir >/dev/null 2>>"$LOG_DIR/update.err" || true
 
-exec "$ANTON_BIN" hook session-start "$@"
+hook_exec_fail_open session-start "$@"

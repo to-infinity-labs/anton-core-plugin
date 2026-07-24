@@ -10,4 +10,4 @@ fi
 if [[ -n "$TRANSCRIPT_PATH" ]]; then
     set -- --transcript-path "$TRANSCRIPT_PATH" "$@"
 fi
-exec "$ANTON_BIN" hook pre-compact "$@"
+hook_exec_fail_open pre-compact "$@"

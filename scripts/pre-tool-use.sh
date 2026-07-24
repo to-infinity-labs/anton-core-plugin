@@ -10,7 +10,4 @@
 # shellcheck source=lib/wrapper.sh disable=SC1091
 source "$(dirname "$0")/lib/wrapper.sh"
 
-if out="$("$ANTON_BIN" hook blast-radius "$@")"; then
-	printf '%s' "$out"
-fi
-exit 0
+hook_exec_fail_open blast-radius "$@"

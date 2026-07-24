@@ -185,3 +185,21 @@ _extract_session_id() {
     # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
     TRANSCRIPT_PATH=$(printf '%s' "$payload" | jq -r '.transcript_path // empty' || true)
 }
+
+# hook_exec_fail_open <verb> [args…] — run the engine subcommand and ALWAYS
+# exit 0, forwarding its stdout only on a zero exit. Generalizes the guarded
+# invocation hotfix v2.2.1 applied to pre-tool-use.sh: a pinned binary that
+# predates <verb> returns unknown-command/exit 2, a crash returns nonzero;
+# either way the wrapper forwards nothing and exits 0, so Claude Code never
+# reads the failure as a PreToolUse deny or a blocked UserPromptSubmit. Under
+# `set -e` the command-substitution failure is caught by the `if`, not fatal.
+# Buffering stdout is safe: hook outputs are small (advisory context / a
+# protocol object). stdin passes through the substitution to the verb (the
+# post-tool-use payload path).
+hook_exec_fail_open() {
+    local out
+    if out="$("$ANTON_BIN" hook "$@")"; then
+        printf '%s' "$out"
+    fi
+    exit 0
+}

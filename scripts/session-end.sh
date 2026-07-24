@@ -57,4 +57,4 @@ if command -v pgrep >/dev/null 2>&1; then
     done
 fi
 
-exec "$ANTON_BIN" hook session-end "$@"
+hook_exec_fail_open session-end "$@"

@@ -20,7 +20,7 @@ Surfaces the blast radius of changing a symbol by walking inbound dependents acr
 anton graph query transitive-walk --seed-id <id> --direction in --rel-types CALLS,EXTENDS,IMPLEMENTS,REFERENCES,RENDERS --depth N [--exclude-ambiguous] [--repo <slug>]
 ```
 
-Resolve `<symbol>` first via the [recall](../recall/SKILL.md) skill unless the input already looks like a symbol-id. With `--paths-to <Y>`, dispatch `paths-between X Y` with the same five-rel filter so the path walk does not silently drop non-`CALLS` chains. From a cwd that is not the registered checkout (a superset worktree), pass `--repo <slug>` to walk the registered repo's graph instead of the cwd's (empty) store.
+Resolve `<symbol>` first via the [recall](../recall/SKILL.md) skill unless the input already looks like a symbol-id. With `--paths-to <Y>`, dispatch `paths-between X Y` with the same five-rel filter so the path walk does not silently drop non-`CALLS` chains. From a cwd that is not the registered checkout (a superset worktree), pass `--repo <slug>` to walk the registered repo's graph instead of the cwd's (empty) store. Inside a linked worktree this is mandatory, not optional: no store is minted there by design, the parent checkout serves the graph, and an unscoped walk fails with `precondition_missing` naming `--repo` as the remedy.
 
 ### Ranking by complexity
 
@@ -37,3 +37,5 @@ Defaults live under the `code_graph.dbc_*` config namespace (`dbc_default_depth=
 ## Output
 
 A `transitive-walk` envelope — top-level `status`, `template` (the discriminator, here `"transitive-walk"`), `rows`, `nodes`, `row_count`, `limit_value`, `truncated`, and `truncated_reason`. One row per visited dependent, sorted `hop ASC, id ASC`, each carrying `id`, `hop`, `path[]`, `edge_types[]`, `confidence_chain[]`, and `min_confidence`; `nodes` maps each id to its `{title, kind}`. Per-row `edge_types[]` records which relation type entered the row, so heterogeneous chains can be labelled (e.g. `─CALLS─▶`, `─EXTENDS─▶`, `─REFERENCES─▶`). One `query_log` row per invocation. Contract: [docs/plugin-spec/05-cli-contract.md#graph-query](../../docs/plugin-spec/05-cli-contract.md#graph-query).
+
+**Stale store — exit 3, not a tool failure.** When the repo's graph store sits at a different schema version than the running binary, the verb does not read it: it exits **3** with a `precondition_missing` envelope naming the remedy (a write verb — `anton graph index` or `anton repos sync` — migrates it). The store is left untouched, deliberately, so a read can never destroy one. This is the normal state on the first run after an upgrade; surface the remediation rather than reporting a generic tool failure.

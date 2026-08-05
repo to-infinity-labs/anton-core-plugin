@@ -22,7 +22,7 @@ anton memory explore --seed-id <id> [--depth N] [--rel-types T1,T2] [--direction
 
 ## Output
 
-Success envelope is a JSON object with `nodes` and `edges` arrays plus the `requested_depth` / `applied_depth` / `seed_bumped` echo fields. Each node carries `id`, `type`, `title`, `summary`, `kind`, `complexity`, and `hop_distance` (and `content` when `--include-content` was passed); each edge carries `source`, `target`, `rel_type`, and `weight`. Only the seed's `access_count` is bumped — walk traversal is not a touch. Contract: [docs/plugin-spec/05-cli-contract.md#memory-explore](../../docs/plugin-spec/05-cli-contract.md#memory-explore).
+Success envelope is a JSON object with `nodes` and `edges` arrays plus the `requested_depth` / `applied_depth` / `seed_bumped` echo fields. Each node carries `id`, `type`, `title`, `summary`, `kind`, `complexity`, and `hop_distance` (and `content` when `--include-content` was passed); each edge carries `source`, `target`, `rel_type`, and `weight`. Only the seed's `access_count` is bumped — walk traversal is not a touch. Contract: `memory-explore` in the anton-core CLI contract.
 
 ## See also
 

@@ -40,4 +40,4 @@ Per-verb envelopes:
 - `task complete` returns `{"status":"ok","task":{"id":"task-NNN","completed":<epoch-ms>}}`.
 - `task update` returns `{"status":"ok","task":{...}}` — the full updated row, even when the new value equals the old one (there is no no-op short-circuit). `--group NAME` moves the task (folded, `inbox` reserved) and `--group ""` clears the group — the task returns to the inbox; either counts toward the at-least-one-field requirement. An update naming no fields errors `{"error":{"kind":"invalid_argument","detail":"invalid argument: at least one of --title, --status, --priority, --due, --reminder, --notes, --owner, --group must be supplied"}}`.
 
-Errors surface as typed envelopes `{"error":{"kind":"...","detail":"..."}}`. Contract: [docs/plugin-spec/05-cli-contract.md#task-list](../../docs/plugin-spec/05-cli-contract.md#task-list).
+Errors surface as typed envelopes `{"error":{"kind":"...","detail":"..."}}`. Contract: `task-list` in the anton-core CLI contract.

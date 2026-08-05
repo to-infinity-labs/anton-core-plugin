@@ -2,7 +2,7 @@
 # Canonical skill-invocation surface. Sources lib/wrapper.sh (which
 # bootstraps the per-platform binary on first call AND owns the
 # authoritative-gated CLAUDE_PLUGIN_DATA -> CORE_DATA_DIR translation the
-# Go CLI's path-resolution layer (internal/db.ResolveRoot) reads), then
+# Go CLI's path-resolution layer reads), then
 # execs the binary. This shim only captures ANTON_DATA_DIR_AUTHORITATIVE
 # (before the CLAUDE_PLUGIN_DATA := default masks it) so wrapper.sh can
 # tell a Claude-Code-provided data root from an operator-shell default.
@@ -129,8 +129,8 @@ if [[ "${1:-}" == "--wrapper-check" ]]; then
             "$CLAUDE_PLUGIN_ROOT" >&2
         exit 2
     fi
-    # Pin-based binary resolution, mirroring scripts/lib/wrapper.sh (ADR 0051 —
-    # hooks answer or enqueue). scripts/core NEVER fetches; this diagnostic
+    # Pin-based binary resolution, mirroring scripts/lib/wrapper.sh (hooks
+    # answer or enqueue). scripts/core NEVER fetches; this diagnostic
     # reports the LIVE resolution so it cannot lie about which binary a
     # `core <verb>` would exec. Precedence (same as wrapper.sh):
     #   (1) the pin at data/state/installed-version → data/versions/v<ver>/anton-core;
@@ -285,8 +285,8 @@ if ! source "$_script_dir/lib/wrapper.sh" 2>"$_wrapper_src_err"; then
 fi
 rm -f "$_wrapper_src_err"
 
-# Missing-binary precondition. The sourced wrapper (ADR 0051 — hooks answer or
-# enqueue) resolves the pin / dev build / staged slot but NEVER fetches; it
+# Missing-binary precondition. The sourced wrapper (hooks answer or enqueue)
+# resolves the pin / dev build / staged slot but NEVER fetches; it
 # defers the print via ANTON_DEFER_BOOTSTRAP_ERROR so this shim owns the
 # skill-shape envelope. When nothing resolved to an executable binary, emit the
 # precondition envelope on stderr (skills treat stdout as data, so the error

@@ -6,7 +6,7 @@
 # `unknown command` error (exit 2) must fail OPEN, not gate the edit. Run the
 # verb best-effort, forward its advisory output only on success (so a lagging
 # binary's error envelope is never surfaced as a PreToolUse decision), and always
-# exit 0 — the non-blocking-hooks contract (docs/plugin-spec/08-hooks.md).
+# exit 0 — the non-blocking-hooks contract.
 # shellcheck source=lib/wrapper.sh disable=SC1091
 source "$(dirname "$0")/lib/wrapper.sh"
 

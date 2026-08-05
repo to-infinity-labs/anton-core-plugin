@@ -25,7 +25,7 @@ anton usage doctor --session-id <session-id> [--repair] [--format json|text]
 
 ## Output
 
-`usage stats` returns `{"status":"ok","window":"30d","estimated":true,"totals":{...},"total_usd":<number|null>,"cache_hit_ratio":N,"per_model":[...],"per_project":[...],"lanes":{"main":N,"subagent":N,"aux":N},"unpriced_models":[...]}` plus an `attribution` section when the window holds telemetry-sourced rows. `usage doctor` returns `{"status":"ok","session_id":"...","result":"match|drift|missing_ledger_rows|missing_transcript","repaired":bool,"repair_refused":bool,"transcript":{"rows":N,"total":N},"ledger":{"rows":N,"total":N},"diff":[...]}`. Contract: [docs/plugin-spec/05-cli-contract.md#usage-stats](../../docs/plugin-spec/05-cli-contract.md#usage-stats).
+`usage stats` returns `{"status":"ok","window":"30d","estimated":true,"totals":{...},"total_usd":<number|null>,"cache_hit_ratio":N,"per_model":[...],"per_project":[...],"lanes":{"main":N,"subagent":N,"aux":N},"unpriced_models":[...]}` plus an `attribution` section when the window holds telemetry-sourced rows. `usage doctor` returns `{"status":"ok","session_id":"...","result":"match|drift|missing_ledger_rows|missing_transcript","repaired":bool,"repair_refused":bool,"transcript":{"rows":N,"total":N},"ledger":{"rows":N,"total":N},"diff":[...]}`. Contract: `usage-stats` in the anton-core CLI contract.
 
 ## See also
 

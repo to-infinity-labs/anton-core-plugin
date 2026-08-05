@@ -27,16 +27,15 @@ export ANTON_DATA_DIR_AUTHORITATIVE
 : "${CLAUDE_PLUGIN_ROOT:=$(cd "$(dirname "$0")/.." && pwd)}"
 export CLAUDE_PLUGIN_ROOT
 
-# CLAUDE_PLUGIN_DATA is the persistent state root per
-# docs/plugin-spec/00-overview.md:56 (the three-location split). The binary
+# CLAUDE_PLUGIN_DATA is the persistent state root
+# (the three-location split). The binary
 # cache lives here so it survives plugin updates that wipe CLAUDE_PLUGIN_ROOT.
 # For repo-local dev runs without DATA set, fall back to PLUGIN_ROOT so the
 # Makefile's `make build` output at bin/ remains the source of truth.
 : "${CLAUDE_PLUGIN_DATA:=$CLAUDE_PLUGIN_ROOT}"
 export CLAUDE_PLUGIN_DATA
 
-# Translate to the $CORE_DATA_DIR the Go resolver (internal/db.ResolveRoot,
-# docs/plugin-spec/04-paths-and-config.md §path-resolution) reads — but ONLY
+# Translate to the $CORE_DATA_DIR the Go path resolver reads — but ONLY
 # when CLAUDE_PLUGIN_DATA is authoritative. In operator-shell mode it was just
 # defaulted to the cache above; pinning CORE_DATA_DIR there is exactly the bug
 # that stranded data in the rotating cache. Leaving it unset lets the resolver
@@ -46,7 +45,7 @@ if [[ "${ANTON_DATA_DIR_AUTHORITATIVE:-}" == "yes" ]]; then
     export CORE_DATA_DIR
 fi
 
-# ── Binary resolution (ADR 0051 — hooks answer or enqueue) ────────────────
+# ── Binary resolution (hooks answer or enqueue) ────────────────
 # Hooks never fetch or manage the binary. Resolution is a fixed precedence:
 #   (1) the pin written by a successful `update apply-if-staged`;
 #   (2) a repo-local dev build (`make build` → bin/anton-core);
@@ -58,7 +57,7 @@ fi
 # setup + the detached stage step per the update-lifecycle re-home.
 
 # Read the binary_path field out of a staged-update.json record (the prefetch
-# artefact, internal/update.StagedUpdate). jq preferred; grep is a defensive
+# artefact, the Go staged-update record). jq preferred; grep is a defensive
 # fallback so the wrapper still self-heals on a host without jq. Prints the
 # path, or empty on any miss.
 _read_staged_binary_path() {
@@ -82,7 +81,7 @@ _read_staged_binary_path() {
 # written by `update apply-if-staged` after its health gate). The pin
 # decouples the running binary from Claude Code's /plugin update cadence: a
 # `git pull` that bumps plugin.json never changes which binary the wrapper
-# exec's. Per docs/adr/0051-hooks-answer-or-enqueue.md.
+# exec's — hooks answer or enqueue, they never fetch.
 PIN_FILE="${CLAUDE_PLUGIN_DATA}/data/state/installed-version"
 ANTON_BIN=""
 if [[ -f "$PIN_FILE" ]]; then
@@ -151,8 +150,8 @@ if [[ ! -x "$ANTON_BIN" ]]; then
 fi
 
 # Helper used by SessionEnd and PreCompact wrappers. Sets SESSION_ID from
-# Claude Code's stdin JSON payload (docs/plugin-spec/08-hooks.md) for
-# injection as --session-id, and sets TRANSCRIPT_PATH from .transcript_path
+# Claude Code's stdin JSON payload for injection as --session-id, and sets
+# TRANSCRIPT_PATH from .transcript_path
 # for --transcript-path injection (fail→success pattern mining). Production
 # path: stdin is piped, jq is present, payload has session_id. TTY runs
 # (manual invocation, tests) or missing jq fall through with SESSION_ID and

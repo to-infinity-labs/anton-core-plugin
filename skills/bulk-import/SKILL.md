@@ -24,4 +24,4 @@ Use `--dry-run` first to preview the file count and classification before any wr
 
 ## Output
 
-Success envelope reports `status`, `imported`, `skipped`, `by_type`, `noop_count`, `stub_documents_written`, `copies_written`, `copy_failures`, `meta_used`, and `errors` (plus `degraded_no_vector` and `halted` when non-zero / on a halt). Streaming mode emits one JSONL line per file plus a final `{"summary": true, ...}` line. Contract: [docs/plugin-spec/05-cli-contract.md#item-bulk-import](../../docs/plugin-spec/05-cli-contract.md#item-bulk-import).
+Success envelope reports `status`, `imported`, `skipped`, `by_type`, `noop_count`, `stub_documents_written`, `copies_written`, `copy_failures`, `meta_used`, and `errors` (plus `degraded_no_vector` and `halted` when non-zero / on a halt). Streaming mode emits one JSONL line per file plus a final `{"summary": true, ...}` line. Contract: `item-bulk-import` in the anton-core CLI contract.

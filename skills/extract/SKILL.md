@@ -24,4 +24,4 @@ Standalone mode reads from `--source-path` (or stdin) and emits the structured e
 
 ## Output
 
-Success envelope carries `sourceRef`, `actionItems`, `decisions`, `keyPoints`, `openQuestions`, and (under `--pipeline`) `relationships`. The owner filter marks each action item with `createTask: true` or `false` based on assignee. Contract: [docs/plugin-spec/05-cli-contract.md#item-extract](../../docs/plugin-spec/05-cli-contract.md#item-extract).
+Success envelope carries `sourceRef`, `actionItems`, `decisions`, `keyPoints`, `openQuestions`, and (under `--pipeline`) `relationships`. The owner filter marks each action item with `createTask: true` or `false` based on assignee. Contract: `item-extract` in the anton-core CLI contract.

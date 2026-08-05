@@ -28,7 +28,7 @@ Mode 3 also accepts `--relate <type>:<target-id>` (comma-separated or repeated) 
 
 ## Output
 
-Success envelope reports `status`, `written` (id list), `extracted`, `noop`, `rejected`, `type` (primary item type), `source_path`, `errors`, `warnings`, and `meta_used`, plus `saved_path` on a Mode 1 source copy and `relations_written` when `--relate` was supplied (the count of edges written with the item — the full set on a fresh item, `0` when the item deduped onto an existing row so no source landed for the edges to attach to). Contract: [docs/plugin-spec/05-cli-contract.md#item-save](../../docs/plugin-spec/05-cli-contract.md#item-save).
+Success envelope reports `status`, `written` (id list), `extracted`, `noop`, `rejected`, `type` (primary item type), `source_path`, `errors`, `warnings`, and `meta_used`, plus `saved_path` on a Mode 1 source copy and `relations_written` when `--relate` was supplied (the count of edges written with the item — the full set on a fresh item, `0` when the item deduped onto an existing row so no source landed for the edges to attach to). Contract: `item-save` in the anton-core CLI contract.
 
 ## Curation
 

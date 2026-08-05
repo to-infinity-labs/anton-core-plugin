@@ -3,13 +3,13 @@
 #
 # Standalone executable, NEVER sourced by a hook. This is the ONE surface that
 # downloads the anton-core binary: the hook path (scripts/lib/wrapper.sh) was
-# gutted per ADR 0051 (hooks answer or enqueue) and now only resolves an
+# gutted per the hooks-answer-or-enqueue redesign and now only resolves an
 # already-installed binary; scripts/core emits a precondition envelope on a
 # miss; and /anton-core:setup invokes THIS script to install on a fresh box,
 # then rotates the staged slot in via `core update apply-if-staged`.
 #
 # It fetches the matching per-platform release binary from the PUBLIC release
-# repo (unauthenticated HTTPS, ADR 0037 public-distribution), verifies it
+# repo (unauthenticated HTTPS, per the public-distribution design), verifies it
 # (transport-integrity checksum always; supply-chain cosign opportunistically),
 # installs it into the pin layout at data/versions/v<ver>/anton-core, and writes
 # the staged-update.json prefetch record so setup's apply-if-staged can rotate
@@ -43,8 +43,8 @@ _script_dir="$(cd "$(dirname "$0")" && pwd)"
 
 # CLAUDE_PLUGIN_DATA is the persistent state root. Resolution, in order:
 #   1. Caller-provided env, NORMALIZED: a trailing `data` segment is stripped —
-#      the exact mirror of internal/db/paths.go::normalizeRoot, which the Go
-#      binary applies to CORE_DATA_DIR. Without this, a hand-assembled
+#      the exact mirror of the Go resolver's root-normalization logic, which the
+#      Go binary applies to CORE_DATA_DIR. Without this, a hand-assembled
 #      `<root>/data` value stages into `<root>/data/data/{versions,state}`
 #      while the binary reads `<root>/data/...` — the nested-tree failure that
 #      bricked the v2.1.0 field install.
@@ -326,7 +326,8 @@ fi
 
 # ── Cosign verify (supply-chain, opportunistic) ───────────────────────────
 # cosign absent, or the sigstore bundle 404s → checksum-only integrity, proceed
-# (ADR 0037 § verification). cosign present AND it REJECTS → hard-fail.
+# (per the public-distribution verification design). cosign present AND it
+# REJECTS → hard-fail.
 cosign_verified="false"
 if command -v cosign >/dev/null 2>&1; then
     # Best-effort bundle fetch. MUST be a separate curl call: a release missing
@@ -377,7 +378,7 @@ fi
 
 # ── Write the staged-update.json prefetch record (atomic, mode 0600) ──────
 # This is "the prefetch layout — one staging contract": the exact JSON keys of
-# internal/update.StagedUpdate. binary_path is RELATIVE to the data dir (matches
+# the Go staged-update record. binary_path is RELATIVE to the data dir (matches
 # the Go prefetch writer); target_version + binary_path are load-bearing
 # (apply-if-staged + wrapper.sh read them). Setup then rotates it in.
 mkdir -p "$state_dir"
@@ -396,7 +397,7 @@ fi
 # When the root was self-derived (no env), persist it to
 # ~/.anton-core/config.json so every later binary call — `update
 # apply-if-staged`, `db init`, all of Stage 1+ — resolves the same root via
-# the operator-config step (internal/db/paths.go::ResolveRoot step 3, and
+# the operator-config step (the Go path resolver's root-resolution step 3, and
 # scripts/core's non-authoritative read) with NO environment at all. An
 # existing config is operator-owned and never touched; `core setup
 # persist-data-dir` remains the owner for all later updates. Deliberately

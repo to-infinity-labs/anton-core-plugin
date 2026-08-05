@@ -12,7 +12,8 @@ if [[ -n "$TRANSCRIPT_PATH" ]]; then
 fi
 
 # Shared log dir for the dashboard reaps below. Two former blocks are gone: the
-# detached `update prefetch` child (ADR 0051 moved skew prefetch to SessionStart)
+# detached `update prefetch` child (hooks answer or enqueue moved skew prefetch
+# to SessionStart)
 # and the cache-binary reap + consolidate spawn. The Go `hook session-end` verb
 # now owns the cache-binary reap (ReapPluginCacheBinaries) and enqueues a single
 # detached `session finalize` child that runs the intelligence chain — including

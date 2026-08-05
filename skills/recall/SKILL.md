@@ -26,7 +26,7 @@ Code recall ranks symbols defined in test files below every production symbol, s
 
 ## Output
 
-Default success envelope is `{"items":[...],"count":N}`; `--format text` emits the `<memory>` block of `<hit>` elements (metadata as attributes — `cos` is the vector cosine to two decimals, or `-` when the hit carried no vector evidence — with the full title and a `▸` snippet line as body). A code hit's `source` attribute is `<slug>:<relpath>:<line>` (the line segment present when the symbol's starting line is known), giving a direct jump target. Every call writes one row to `events.access_log` capturing `result_signals` (the bump state). Contract: [docs/plugin-spec/05-cli-contract.md#memory-recall](../../docs/plugin-spec/05-cli-contract.md#memory-recall).
+Default success envelope is `{"items":[...],"count":N}`; `--format text` emits the `<memory>` block of `<hit>` elements (metadata as attributes — `cos` is the vector cosine to two decimals, or `-` when the hit carried no vector evidence — with the full title and a `▸` snippet line as body). A code hit's `source` attribute is `<slug>:<relpath>:<line>` (the line segment present when the symbol's starting line is known), giving a direct jump target. Every call writes one row to `events.access_log` capturing `result_signals` (the bump state). Contract: `memory-recall` in the anton-core CLI contract.
 
 ## Curation
 

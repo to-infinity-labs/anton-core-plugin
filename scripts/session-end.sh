@@ -16,8 +16,8 @@ fi
 # to SessionStart)
 # and the cache-binary reap + consolidate spawn. The Go `hook session-end` verb
 # now owns the cache-binary reap (ReapPluginCacheBinaries) and enqueues a single
-# detached `session finalize` child that runs the intelligence chain — including
-# consolidation — in-process, so no consolidate spawn is needed here.
+# detached `session finalize` child that runs the intelligence chain in-process.
+# Consolidation is not in that chain: SessionStart dispatches it once a day.
 LOG_DIR="${CLAUDE_PLUGIN_DATA:-/tmp}/data/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 

@@ -17,11 +17,11 @@ Walks a directory, classifies each file, and routes every file through the same 
 ## How
 
 ```
-anton item bulk-import --path <dir> [--recursive] [--dry-run] [--format json|jsonl|summary] [--concurrency N] [--quiet]
+anton item bulk-import --path <dir> [--recursive] [--dry-run] [--format json|jsonl|summary] [--concurrency N] [--quiet] [--consolidate]
 ```
 
-Use `--dry-run` first to preview the file count and classification before any write. Re-running against an unchanged, completed directory skips every file via its stored source hash (no extraction cost); the checkpoint only resumes an *interrupted* run. `--format` defaults to `jsonl` (streaming); `--concurrency` sets the per-batch concurrent save count (>= 1, default 3).
+Use `--dry-run` first to preview the file count and classification before any write. Re-running against an unchanged, completed directory skips every file via its stored source hash (no extraction cost); the checkpoint only resumes an *interrupted* run. `--format` defaults to `jsonl` (streaming); `--concurrency` sets the per-batch concurrent save count (>= 1, default 3). `--consolidate` chains one graph-consolidation pass after a fully clean run; leave it off unless you want the graph built now, since consolidation runs once a day on its own.
 
 ## Output
 
-Success envelope reports `status`, `imported`, `skipped`, `by_type`, `noop_count`, `stub_documents_written`, `copies_written`, `copy_failures`, `meta_used`, and `errors` (plus `degraded_no_vector` and `halted` when non-zero / on a halt). Streaming mode emits one JSONL line per file plus a final `{"summary": true, ...}` line. Contract: `item-bulk-import` in the anton-core CLI contract.
+Success envelope reports `status`, `imported`, `skipped`, `by_type`, `noop_count`, `stub_documents_written`, `copies_written`, `copy_failures`, `meta_used`, and `errors` (plus `degraded_no_vector` when non-zero, and `halted` with a `halt_reason` — `halt_class_error` or `consecutive_extractor_failures` — when the import stopped early; the latter fires after `extractor.max_consecutive_failures` consecutive engine-caused stubs, so a rate-limited engine is not paid one spawn per remaining file). Streaming mode emits one JSONL line per file plus a final `{"summary": true, ...}` line. Contract: `item-bulk-import` in the anton-core CLI contract.

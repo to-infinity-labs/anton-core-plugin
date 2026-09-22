@@ -5,6 +5,37 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-09-22
+
+### Fixed
+
+- When Anton cannot open its store, it now tells you why. Every failure used to
+  come back as "set CORE_DATA_DIR" — advice about a setting that was usually
+  correct — whether the store was locked by another process, corrupt on disk, or
+  sitting somewhere unreadable. Each of those now says so, and "set
+  CORE_DATA_DIR" means only what it says: no data directory was found at all.
+
+- A damaged store no longer breaks new sessions. Starting a session against a
+  store Anton could not open ended in a crash report, and because the
+  session-start hook is allowed to block, that crash blocked the session itself.
+  The hooks now start quietly with safe defaults and let you get on with your
+  work, which also leaves the store readable enough to diagnose.
+
+- Several commands crashed instead of explaining themselves when no data
+  directory was configured — `task`, `patterns` and `improvement` among them.
+  They now return the same clear message the others always did.
+
+- A busy store is reported as busy. A write that waited out the lock and gave up
+  used to be reported as an internal error, sending you looking for a bug
+  instead of for whatever else was writing at the time.
+
+- Daily maintenance clears the cooldown files the error-recall reflex leaves
+  behind. One was kept per session per distinct error and nothing ever removed
+  them; a long-running store had accumulated over two thousand, the oldest three
+  months old. Anything maintenance cannot read or delete is now counted and
+  reported rather than passed over in silence.
+
+
 ## [2.7.0] - 2026-09-10
 
 ### Changed
@@ -189,7 +220,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.4.0...v2.5.0

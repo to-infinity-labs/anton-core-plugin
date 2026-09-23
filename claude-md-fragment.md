@@ -60,7 +60,7 @@ The tools you reach for while working. Memory and Code Graph are agent-primary �
 
 - **Memory** — save (`anton item save`), extract (`anton item extract`), bulk-import (`anton item bulk-import`), remove (`anton item delete`), recall (`anton memory recall`), expand (`anton item get`), explore (`anton memory explore`), share (prompt-only, no backing command)
 - **Code Graph** — callers, callees, impact, paths, cycles — skills over the read-only `anton graph query <template>` surface (`--direction`, `--rel-types`); invoke as `/anton-core:callers` etc., never a bare command
-- **Activity** — tasks (`anton task add|list|due|groups|complete|update`), summary (`anton report summary`), sessions (`anton session list|get|stats|mark-reflected`), improvements (`anton improvement list|approve|dismiss`), usage (`anton usage stats|doctor`)
+- **Activity** — tasks (`anton task add|list|due|groups|complete|update`), summary (`anton report summary`), sessions (`anton session list|get|stats|mark-reflected`), improvements (`anton improvement list|approve|dismiss`), usage (`anton usage stats|doctor|profile|span`)
 - **System** — setup (`anton setup probe|link-shell|install-daemon|…`), health (`anton report health`), maintenance (`anton maintenance run|dedup|purge|prune|…`), dashboard (`anton dashboard`)
 
 ## Intent Routing

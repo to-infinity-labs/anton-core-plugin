@@ -5,6 +5,57 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-23
+
+### Added
+
+- `usage span` shows what a project has spent over any stretch of time, read
+  straight from its Claude Code transcripts. The usage ledger is only written
+  when a session ends, so until now there was no way to ask what the last hour
+  of a session still running had cost. Give it a start time and the project's
+  transcript folder; it reports input, output and cache tokens, split between
+  the main session and its subagents.
+
+- Sessions on Claude Opus 5 and Opus 5.5 are now priced. Opus 5 had no price
+  on file, so its sessions showed token counts but no cost.
+
+### Fixed
+
+- Subagent output is no longer undercounted. Claude Code writes a streamed
+  reply as several transcript lines, and a subagent's early lines carry only a
+  partial output count; Anton was keeping the first line, so subagent output
+  was reported at roughly a fifth of its real size. Each reply now counts at its
+  final line. Main-session figures were already right and are unchanged.
+  Sessions recorded before this release keep their old figures until
+  re-extracted — `anton usage doctor --session-id <id> --repair` does one
+  session.
+
+- Notes containing a long unbroken string — a base64 image, a JWT, a run of
+  concatenated hashes — were saved but could never be found by meaning. Anton
+  measures how large a note is before deciding how to index it, and any stretch
+  of more than a hundred letters or digits with no break was being measured as
+  though it were a single short word. A 3,000-character blob looked smaller than
+  a sentence, so nothing was split up, nothing was trimmed, and the part that
+  does the indexing rejected it. The note stayed in your store and answered
+  keyword searches, but searching by meaning would never return it. Such notes
+  are now measured correctly and indexed in full.
+
+- Saving or updating a note now tells you when it was stored without a
+  searchable index. Before, the save reported plain success — the note was
+  there, it just could not be found by meaning, and nothing said so. Both
+  `item save` and `item update` now report it, and `report health` has a new
+  check showing how much of your store is in that state and how to fix it.
+
+- One unindexable note no longer stops the repair job. `maintenance reindex`
+  used to abort the entire run the moment it hit a note it could not process,
+  so every other note still waiting was left waiting — including the ones the
+  run was started to fix. It now records that note and carries on, and says
+  which ones it skipped and why.
+
+- Saving a note with a large embedded blob is no longer slow. A 40KB attachment
+  took around twelve seconds to index, and paid it again on every edit.
+
+
 ## [2.8.0] - 2026-09-22
 
 ### Fixed
@@ -220,7 +271,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.5.0...v2.6.0

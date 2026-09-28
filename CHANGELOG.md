@@ -5,6 +5,145 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-28
+
+### Added
+
+- Code search follows class hierarchies in every language it indexes. It
+  records which classes extend or implement which, and a method call that is
+  not found on a class is looked up on its parents.
+
+- In TypeScript, `new Widget(x)` now counts as a call to `Widget`, so asking
+  who calls a class shows where it is created.
+
+- Ruby and PHP files now have call links, not just their definitions.
+
+- Code search now works inside git worktrees. Each worktree gets its own code
+  graph, copied from the main checkout's graph the first time you ask and then
+  caught up on that branch's commits and your uncommitted edits. If catching up
+  takes longer than about five seconds, the rest finishes in the background at
+  low priority and the answer says it is still indexing.
+
+- Every code search checks for changed files first, so a branch switch, a pull
+  or an edit you haven't committed shows up without running `anton repos sync`.
+
+- Indexing is lighter on your machine: two workers, a 1.5 GiB soft memory
+  limit, and low priority in the background. `code_graph.index_workers` and
+  `code_graph.index_memory_limit_mb` change the limits.
+
+- Anton now backs up its databases before upgrading them. When a new version
+  first opens your data and has schema changes to apply, it copies each store
+  into `data/snapshots/pre-migrate/` first. If an upgrade step fails partway,
+  the store is put back as it was and the error is reported, so it is never
+  left half-upgraded. The two most recent backups per store are kept. If the
+  backup itself cannot be written, the upgrade still runs and
+  `anton report health` warns that it ran without one.
+
+- The daily maintenance pass now checks the full-text search index and
+  rebuilds it only when it has drifted out of sync with your notes. Before,
+  that repair ran only when a release was staged.
+
+- `anton maintenance reset --target judged-unjudgeable` reopens note pairs
+  that consolidation gave up on, so the next pass asks about them again.
+  `anton report health` now shows how many pairs are waiting for a retry and
+  how many were given up on.
+
+### Changed
+
+- Every skill now shows the exact response of each command it runs, checked
+  against the CLI contract.
+
+### Fixed
+
+- Code search no longer guesses call links. When it cannot tell what type a
+  method is called on, it leaves the call unresolved instead of linking it to
+  whichever function of that name it happens to know. It works the type out
+  from the file itself, one step through a called function's declared return
+  type, and the class hierarchy. The resolved-call share in
+  `anton report health` moves as a result: calls into standard libraries and
+  other packages are counted as external, and links that were guesses are
+  gone. Each code index rebuilds itself once, in the background, after the
+  upgrade.
+
+- A fresh code index and one kept up to date file by file now agree on every
+  call link.
+
+- C# methods are listed under their own names rather than their return type,
+  and Rust functions with the same name in different modules or types are
+  kept apart.
+
+- C# type names are linked the way the C# compiler finds them — through the
+  surrounding namespaces, the file's `using` lines and the project's
+  `global using` lines — so a class's base types and the classes it creates
+  are linked across files. When two places could supply the same name, the
+  link is left out rather than guessed.
+
+- Recursive Go functions no longer fill the events log with warnings.
+
+- A file that crashes the code parser no longer stops the whole index. It is
+  skipped until it changes, and `anton report health` lists it.
+
+- Updating the index after an edit no longer loses the links from other files
+  that call into the edited one.
+
+- An index that was interrupted part-way is no longer reported as up to date.
+  The next sync picks up where it stopped.
+
+- Minified `*.min.js` / `*.min.css` files and `vendor/` folders are no longer
+  indexed, and a repo that itself lives under a folder named `vendor`, `build`,
+  `bin` or `dist` is no longer skipped entirely.
+
+- Consolidation no longer silently drops a pair of notes when the model
+  doesn't answer about it. A pair the model skipped, or whose question hit an
+  error, used to be passed over for good. It is now retried first on the next
+  pass, and it is given up on only after failing on its own three times
+  (`link.judge_max_attempts` and `dream.judge_max_attempts` set the limit).
+  If the `claude` command is missing, the pass stops without using up any
+  retries. Pairs lost this way before this release can be found again by
+  rewinding the link cursor:
+  `anton maintenance reset --target link-cursor --to <date>`.
+
+- Consolidation no longer skips an hour of work because a note it was judging
+  happened to talk about rate limits. Only a real usage-limit message from
+  Claude pauses it now.
+
+- An older Anton session no longer writes into data a newer version has
+  upgraded in a way it cannot safely handle. It opens that data read-only:
+  searches and reads keep working, writes fail with a `schema_skew` error
+  (exit code 3), and the session start briefing says so once. Restarting the
+  session on the newer version clears it.
+
+- An older session no longer deletes a code graph built by a newer version,
+  which forced a full re-index every time the two alternated. It now opens the
+  newer graph read-only and asks you to restart instead.
+
+- Searching code or docs with `recall --code` or `--docs` no longer comes back
+  silently empty when the repo hasn't been indexed yet, or its index is empty.
+  You now get a warning that says so and names the fix: `anton repos sync`, or
+  `anton repos add <path>` if the repo was never registered. A repo registered
+  through a symlinked folder is recognised correctly.
+
+- `recall --all` now marks memory results with how many links they have and,
+  when one has been replaced by a newer note, which note replaced it. Only the
+  plain `recall` did this before. When two notes replaced the same one at the
+  same moment, the same one is now reported every time.
+
+- Task nudges reach Claude again. Every half hour or so, when you have overdue
+  or soon-due tasks, Anton is meant to slip a short `[Task nudge]` reminder into
+  Claude's context so it can mention them in passing. The reminder was being
+  built but never delivered, so Claude never saw it. It now arrives the same
+  way the session-start briefing does.
+
+- `anton hook validate` now checks all seven of the plugin's hooks. It checked
+  only four, so a broken or missing tool-use hook passed validation.
+
+- The `anton` shortcut that setup installs in `~/.local/bin` no longer breaks
+  Anton inside Claude Code. It sat ahead of the plugin's own launcher, so
+  commands such as `anton setup probe` failed with `plugin_data_unset`. Inside
+  a session it now hands off to the plugin launcher. In a plain terminal,
+  `setup probe`, `setup link-shell` and `setup uninstall` find your data folder
+  from `~/.anton-core/config.json` instead of refusing to run.
+
 ## [2.9.0] - 2026-09-23
 
 ### Added
@@ -271,7 +410,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.6.0...v2.7.0

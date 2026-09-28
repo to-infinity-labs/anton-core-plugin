@@ -25,15 +25,17 @@ anton maintenance purge --target {stale|legacy-stubs}
 anton maintenance prune --target {orphans|graph-stores} [--dry-run] [--include-populated --force] [--quiet]
 anton maintenance retry --target extraction
 anton maintenance calibrate --target link [--dry-run]
-anton maintenance reset --target {access-log|judged-refusals|link-cursor --to <unix-ms|RFC3339>} [--dry-run]
+anton maintenance reset --target {access-log|judged-refusals|judged-unjudgeable|link-cursor --to <unix-ms|RFC3339>} [--dry-run]
 anton maintenance reindex --target {knowledge|code}
 anton maintenance repair --target fts [--dry-run]
 anton maintenance status [--history Nd]
 ```
 
-`run` dispatches nine pinned jobs in a fixed order — `fold_stray_types`, `fold_stray_rel_types`, `decay`, `backfill_task_sidecars`, `dedup_tasks`, `purge_legacy_stubs`, `repo_renamed_sweep`, `resolve_all_per_repo`, `reap_recall_sentinels` — under one lock acquisition, the two folds first so the rest of the sweep sees canonical data. `fold_stray_rel_types` folds each off-vocabulary relationship verb in its own savepoint, preserving the original as a raw-type tag; a relationship it cannot fold is counted under a named cause and left on disk rather than aborting the sweep behind it, so `folded` may fall short of `scanned`.
+`run` dispatches ten pinned jobs in a fixed order — `fts_heal`, `fold_stray_types`, `fold_stray_rel_types`, `decay`, `backfill_task_sidecars`, `dedup_tasks`, `purge_legacy_stubs`, `repo_renamed_sweep`, `resolve_all_per_repo`, `reap_recall_sentinels` — under one lock acquisition. `fts_heal` runs first so no later job reads a desynced full-text index: it rebuilds only an index that fails its integrity check, recording `FTS_REBUILT`. A non-empty `fts_heal.fts_still_failing` means the content table behind that index is itself damaged and a rebuild cannot fix it; report it to the operator rather than retrying. The two folds follow, so the rest of the sweep sees canonical data. `fold_stray_rel_types` folds each off-vocabulary relationship verb in its own savepoint, preserving the original as a raw-type tag; a relationship it cannot fold is counted under a named cause and left on disk rather than aborting the sweep behind it, so `folded` may fall short of `scanned`.
 
-`reset --target judged-refusals` deletes the consolidation judge's settled *refusals*, reopening those pairs for re-judging on the next consolidation pass — the escape hatch for a model revision that starts refusing a whole content class, which would otherwise be terminal. The `related` and `not_related` verdicts are permanent and nothing in this surface reverses them. `--dry-run` reports the would-delete count on either target and writes nothing; a real run that deleted at least one refusal emits one WARN `JUDGED_REFUSALS_RESET` event carrying the count.
+`reset --target judged-refusals` deletes the consolidation judge's settled *refusals*, reopening those pairs for re-judging on the next consolidation pass — the escape hatch for a model revision that starts refusing a whole content class, which would otherwise be terminal. The `related` and `not_related` verdicts are permanent and nothing in this surface reverses them. `--dry-run` reports the would-delete count and writes nothing; a real run that deleted at least one refusal emits one WARN `JUDGED_REFUSALS_RESET` event carrying the count.
+
+`reset --target judged-unjudgeable` reopens every consolidation pair the retry ledger retired as unjudgeable — a pair the judge gave no verdict for, which failed alone at `link.judge_max_attempts` / `dream.judge_max_attempts`. It reopens rather than deletes (the retirement clears and the attempt count returns to 0), so the next pass re-offers each pair ahead of its window; `reopened` in the envelope carries the count, `deleted` is 0, and a real run that reopened at least one pair emits one WARN `JUDGED_UNJUDGEABLE_RESET` event. Pairs lost before the retry ledger existed are not on it: after upgrading, recover them once with `reset --target link-cursor --to <instant>` — settled pairs are still skipped on the re-walk, so only pairs that never got a verdict cost a call.
 
 `consolidate` is the manual path only — SessionStart dispatches one detached pass a day on its own, so reach for this verb when you want the graph built now rather than tomorrow. A pass the engine turned away with a rate limit records the reset instant and every later pass reports `stop_reason: cooldown` and spends nothing until it passes; `--force` overrides that as well as the dream and daily cooldowns.
 
@@ -47,4 +49,18 @@ The write verbs (`run`, `consolidate`, `calibrate`, `dedup`, `purge`, `prune`, `
 
 ## Output
 
-Each verb emits one standard result envelope carrying its own discriminator: `envelope.jobs_run` (the pinned slug list) for `run`; `envelope.target` for the eight `--target`-accepting verbs (`calibrate`, `dedup`, `purge`, `prune`, `retry`, `reset`, `reindex`, `repair`); a composite `dream`/`link`/`run_all` block with matching `*_ran` flags for `consolidate`; an `envelope.report.last_run` block plus `events_recent_24h` counts for `status`. The envelopes are flat (no `report` wrapper) for the write verbs and wrapped for `status`. Contract: `maintenance-run` in the anton-core CLI contract.
+Each verb emits one standard result envelope carrying its own discriminator: `envelope.jobs_run` (the pinned slug list) for `run`; `envelope.target` for the eight `--target`-accepting verbs (`calibrate`, `dedup`, `purge`, `prune`, `retry`, `reset`, `reindex`, `repair`); a composite `dream`/`link`/`run_all` block with matching `*_ran` flags for `consolidate`; an `envelope.report.last_run` block plus `events_recent_24h` counts for `status`. The envelopes are flat (no `report` wrapper) for the write verbs and wrapped for `status`:
+
+- `maintenance run` returns `{"status":"ok","started_at":N,"ended_at":N,"jobs_run":[...],"fts_heal":{...}}`, plus one result object per job that ran, keyed by job name.
+- `maintenance consolidate` returns `{"status":"ok","link_ran":<true|false>,"dream_ran":<true|false>,"run_all_ran":<true|false>,"link":{...},"dream":{...},"run_all":{...}}`.
+- `maintenance calibrate` returns `{"status":"ok","target":"link","buckets":[...],"rule":"...","suggested_auto_relate_min":<N|null>,"suggested_min_similarity":<N|null>,"backfilled":N,"missing_cosine":N,"dry_run":<true|false>}`.
+- `maintenance dedup` returns `{"status":"ok","target":"tasks","scanned":N,"deduped":N,"kept":N,"dry_run":<true|false>}`.
+- `maintenance purge` returns `{"status":"ok","target":"stale","access_log_deleted":N,"health_log_deleted":N,"step_log_deleted":N,"compress_log_deleted":N,"events_log_deleted":N,"recall_on_error_log_deleted":N,"expand_log_deleted":N,"query_log_deleted":N,"dry_run":<true|false>}`.
+- `maintenance prune` returns `{"status":"ok","target":"graph-stores","scanned":N,"deleted":N,"reaped_bytes":N,"config_rows_deleted":N,"stores":[...],"dry_run":<true|false>}`.
+- `maintenance retry` returns `{"status":"ok","target":"extraction","retried":N,"succeeded":N,"failed":N,"dry_run":<true|false>}`.
+- `maintenance reset` returns `{"status":"ok","target":"<access-log|judged-refusals|judged-unjudgeable|link-cursor>","deleted":N,"dry_run":<true|false>}`.
+- `maintenance reindex` returns `{"status":"ok","target":"<knowledge|code>","candidates":N,"embedded":N,"cap_hit":N,"skipped_reasons":{...},"dry_run":<true|false>}`.
+- `maintenance repair` returns `{"status":"ok","target":"fts","before_failing":[...],"rebuilt":[...],"still_failing":[...]}`.
+- `maintenance status` returns `{"status":"ok","report":{"last_run":{...},"events_recent_24h":{...},"link_last_run":N,"dream_last_run":N,"dream_cursor_item_id":"...","last_pass_spend_usd":N}}`.
+
+Contract: `maintenance-run` in the anton-core CLI contract.

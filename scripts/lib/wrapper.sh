@@ -92,7 +92,7 @@ if [[ -f "$PIN_FILE" ]]; then
     if [[ ! -x "$ANTON_BIN" ]]; then
         # Pin names a slot that doesn't exist. Refuse to start rather than
         # silently resolve a different version — the pin exists precisely to
-        # prevent that drift. Operator must run `core update rollback` or
+        # prevent that drift. Operator must run `anton update rollback` or
         # repair the versions/ directory.
         printf '⚠ pin names a missing binary slot v%s; operator action required\n' "$INSTALLED_VERSION" >&2
         printf '{"status":"error","error":{"kind":"internal","reason":"pin_drift_fatal","pinned_version":"v%s"}}\n' "$INSTALLED_VERSION" >&2

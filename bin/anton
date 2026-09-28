@@ -11,9 +11,10 @@
 #   bin/anton-core — the dev-build BINARY slot (make build output; wrapper.sh
 #                    and scripts/core resolve it as the binary itself). A
 #                    launcher there would exec back into scripts/core forever.
-#   core           — the operator-shell launcher (~/.local/bin/core →
-#                    <data>/data/bin/core), which execs the live
-#                    data/versions/current binary directly.
+#   data/bin/core  — the operator-shell launcher (~/.local/bin/anton →
+#                    <data>/data/bin/core). In a terminal it execs the live
+#                    data/versions/current binary directly; in a session it
+#                    delegates here.
 #
 # Symlink-safe: resolves $0 via a readlink loop (macOS has no `readlink -f`);
 # the hop cap kills a cyclic-symlink hang. bash-3.2 clean (macOS /bin/bash).
@@ -45,8 +46,9 @@ _script_dir="$(cd "$(dirname "$_script_path")" && pwd)"
 # before the shim, and exec'd from this launcher's own plugin tree — never
 # from the data root. Every other argv passes through to scripts/core,
 # which still answers a missing binary with binary_missing_run_setup.
-# Unreachable from the operator shell by construction: ~/.local/bin/anton
-# targets the data-root binary launcher, not this file.
+# Unreachable from a terminal, where ~/.local/bin/anton runs the data-root
+# launcher; in a session that launcher delegates here, so the intercept is
+# reached under either name.
 if [[ "${1:-}" == "bootstrap" ]]; then
     _fetch="$_script_dir/../scripts/lib/bootstrap-fetch.sh"
     if [[ ! -x "$_fetch" ]]; then

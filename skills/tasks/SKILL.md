@@ -23,6 +23,7 @@ anton task due [--mode overdue|today|soon|nudge-overdue|nudge-soon|reminders] [-
 anton task groups
 anton task complete --id <task-id>
 anton task update --id <task-id> [--title ...] [--status ...] [--priority ...] [--due ...] [--reminder ...] [--owner ...] [--group <name>] [--notes ...]
+anton config get --key owner
 ```
 
 The skill resolves natural-language dates ("tomorrow", "next monday", "in 3 days") before invoking the CLI; the handlers accept only ISO 8601 date strings. Default owner is read from `config.owner` via `anton config get --key owner`.
@@ -38,6 +39,7 @@ Per-verb envelopes:
 - `task groups` returns `{"status":"ok","groups":[{"name":"...","open_count":N,"overdue_count":N,"total_count":N}],"inbox_open_count":N,"count":N}` — one row per live group, name-ascending, plus the open-task count of the inbox. It takes no flags; a completed-only group stays listed (with `open_count` 0) until its last task is purged.
 - `task add` returns `{"status":"ok","id":"task-NNN","title":"...","tags":[...]}`, adding `"owner":"..."` only when `--owner` is supplied — owner values are title-cased (`bob` → `Bob`) — and `"group":"..."` only when `--group` is supplied. Group names are folded on write (lowercased, trimmed, spaces/underscores to hyphens); the reserved name `inbox` is rejected. A repeat `--source-ref` dedups to the existing id and sets `"noop":true`.
 - `task complete` returns `{"status":"ok","task":{"id":"task-NNN","completed":<epoch-ms>}}`.
+- `config get --key owner` returns `{"status":"ok","key":"owner","value":"..."}`; `value` is `null` when no owner is configured.
 - `task update` returns `{"status":"ok","task":{...}}` — the full updated row, even when the new value equals the old one (there is no no-op short-circuit). `--group NAME` moves the task (folded, `inbox` reserved) and `--group ""` clears the group — the task returns to the inbox; either counts toward the at-least-one-field requirement. An update naming no fields errors `{"error":{"kind":"invalid_argument","detail":"invalid argument: at least one of --title, --status, --priority, --due, --reminder, --notes, --owner, --group must be supplied"}}`.
 
 Errors surface as typed envelopes `{"error":{"kind":"...","detail":"..."}}`. Contract: `task-list` in the anton-core CLI contract.

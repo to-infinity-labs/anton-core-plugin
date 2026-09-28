@@ -20,13 +20,14 @@ Read surface over the token-usage ledger the session-extract pass fills. `stats`
 anton usage stats [--window <Nd|duration>] [--project <slug>] [--format json|text]
 anton usage doctor --session-id <session-id> [--repair] [--format json|text]
 anton usage span --since <RFC3339> --project <dir> [--until <RFC3339>] [--format json|text]
+anton item extract --backfill [--force]
 ```
 
 `--window` defaults to `30d`. Rows are windowed on SPEND time (the session's last transcript timestamp), so backfilled history lands in the period it was actually spent. Every dollar figure is an estimate priced from a bundled list-price table with the operator's `usage.pricing_overrides` config merged field-wise over it; an unpriced model reports `null` dollars, never 0, and is named in `unpriced_models`. `doctor --repair` acts on the `drift` and `missing_ledger_rows` verdicts only, and refuses the rewrite (`repair_refused: true`) when the recompute is missing whole buckets of tokens the ledger holds — lost evidence is never papered over. History is populated by `anton item extract --backfill` (add `--force` to re-extract sessions that already have rows).
 
 ## Output
 
-`usage stats` returns `{"status":"ok","window":"30d","estimated":true,"totals":{...},"total_usd":<number|null>,"cache_hit_ratio":N,"per_model":[...],"per_project":[...],"lanes":{"main":N,"subagent":N,"aux":N},"unpriced_models":[...]}` plus an `attribution` section when the window holds telemetry-sourced rows. `usage doctor` returns `{"status":"ok","session_id":"...","result":"match|drift|missing_ledger_rows|missing_transcript","repaired":bool,"repair_refused":bool,"transcript":{"rows":N,"total":N},"ledger":{"rows":N,"total":N},"diff":[...]}`. `usage span` returns `{"status":"ok","project":"...","since":"...","until":"...","totals":{...},"lanes":{"main":N,"subagent":N,"aux":0},"transcripts":N,"skipped_lines":N}`. Contract: `usage-stats`, `usage-doctor` and `usage-span` in the anton-core CLI contract.
+`usage stats` returns `{"status":"ok","window":"30d","estimated":true,"totals":{...},"total_usd":<number|null>,"cache_hit_ratio":N,"per_model":[...],"per_project":[...],"lanes":{"main":N,"subagent":N,"aux":N},"unpriced_models":[...]}` plus an `attribution` section when the window holds telemetry-sourced rows. `usage doctor` returns `{"status":"ok","session_id":"...","result":"match|drift|missing_ledger_rows|missing_transcript","repaired":bool,"repair_refused":bool,"transcript":{"rows":N,"total":N},"ledger":{"rows":N,"total":N},"diff":[...]}`. `usage span` returns `{"status":"ok","project":"...","since":"...","until":"...","totals":{...},"lanes":{"main":N,"subagent":N,"aux":0},"transcripts":N,"skipped_lines":N}`. `item extract --backfill` returns `{"status":"ok","mode":"backfill","sessions_seen":N,"sessions_extracted":N,"sessions_skipped":N}`. Contract: `usage-stats`, `usage-doctor` and `usage-span` in the anton-core CLI contract.
 
 ## See also
 

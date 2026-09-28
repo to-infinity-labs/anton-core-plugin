@@ -21,13 +21,14 @@ anton session list [--since <epoch-ms>] [--limit N]
 anton session get --session-id <session-id>
 anton session stats [--days N]
 anton session mark-reflected --session-id <session-id>
+anton improvement list --applied-only [--limit N]
 ```
 
 `--since` is an epoch-ms Int64 floor on `started_at`, not a date string. Default invocation shells `session stats --days 30` together with `session list --limit 10` and renders both blocks. `--improvements` switches to the applied-only counterpart via `anton improvement list --applied-only --limit 20`; pending review flows through the [improvements](../improvements/SKILL.md) skill.
 
 ## Output
 
-Per-verb envelopes: `session list` returns `{"status":"ok","count":N,"sessions":[{"session_id":"...","headline":"...","started_at":<epoch-ms>,"duration_minutes":N,...}]}`, where each row carries `has_flags:1` only when the session raised flags — the field is omitted when it would be `0`; `session stats` returns `{"period_days":N,"sessions":N,"avg_duration_minutes":N,"avg_messages":N,"flagged_sessions":N,"top_tools":{...},"improvements":N,"token_total":N}` — `token_total` sums each session's main-transcript token buckets (input + output + cache read + cache creation; subagent spend lives in the token-usage ledger, surfaced by [usage](../usage/SKILL.md)); `session mark-reflected` stamps `reflected_at` on the matching row and returns the standard success envelope. Contract: `session-list` in the anton-core CLI contract.
+Per-verb envelopes: `session list` returns `{"status":"ok","count":N,"sessions":[{"session_id":"...","headline":"...","started_at":<epoch-ms>,"duration_minutes":N,...}]}`, where each row carries `has_flags:1` only when the session raised flags — the field is omitted when it would be `0`; `session stats` returns `{"status":"ok","period_days":N,"sessions":N,"avg_duration_minutes":N,"avg_messages":N,"flagged_sessions":N,"top_tools":{...},"improvements":N,"token_total":N}` — `token_total` sums each session's main-transcript token buckets (input + output + cache read + cache creation; subagent spend lives in the token-usage ledger, surfaced by [usage](../usage/SKILL.md)); `session get` returns `{"status":"ok","session":{"session_id":"...","started_at":<epoch-ms>,...}}`; `session mark-reflected` stamps `reflected_at` on the matching row and returns `{"status":"ok","session":{"id":"...","reflected_at":<epoch-ms>}}`; `improvement list --applied-only` returns `{"status":"ok","improvements":[...],"count":N}`. Contract: `session-list` in the anton-core CLI contract.
 
 ## See also
 

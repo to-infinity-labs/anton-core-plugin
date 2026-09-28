@@ -7,11 +7,12 @@
 # (before the CLAUDE_PLUGIN_DATA := default masks it) so wrapper.sh can
 # tell a Claude-Code-provided data root from an operator-shell default.
 # Hooks source lib/wrapper.sh directly; this is the equivalent entry
-# point for everything skills invoke. Ad-hoc operator-shell use does NOT
-# come through here: /anton-core:setup installs a separate minimal launcher
-# (scripts/core-shim.sh -> <data>/data/bin/core) that the ~/.local/bin/core
-# symlink points at, so a bare-shell `core` execs the live
-# data/versions/current pointer instead of this version-pinned shim.
+# point for everything skills invoke. Terminal use does NOT come through
+# here: /anton-core:setup installs a separate minimal launcher
+# (scripts/core-shim.sh -> <data>/data/bin/core) that the ~/.local/bin/anton
+# symlink points at, so a bare-shell `anton` execs the live
+# data/versions/current pointer instead of this version-pinned shim. Inside a
+# session that launcher delegates to bin/anton, which execs this shim.
 #
 # Symlink-safe: resolves $0 via readlink so $CLAUDE_PLUGIN_ROOT derives
 # correctly even if this shim is itself reached through a symlink (dev
@@ -90,6 +91,12 @@ if [[ "$ANTON_DATA_DIR_AUTHORITATIVE" == "no" ]] && [[ -z "${CLAUDE_PLUGIN_DATA+
                 | head -1 | sed -E 's/.*"data_root"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' || true)"
         fi
     fi
+    # Same normalisation as the binary's resolver: a root given as <root>/data
+    # would otherwise nest data/data, and /data or / resolve to / as they do there.
+    _anton_cfg_raw="$_anton_cfg_root"
+    _anton_cfg_root="${_anton_cfg_root%/}"
+    [[ "${_anton_cfg_root##*/}" == "data" ]] && _anton_cfg_root="${_anton_cfg_root%/data}"
+    [[ -z "$_anton_cfg_root" && -n "$_anton_cfg_raw" ]] && _anton_cfg_root="/"
     if [[ -n "$_anton_cfg_root" ]]; then
         CLAUDE_PLUGIN_DATA="$_anton_cfg_root"
         CORE_DATA_DIR="$_anton_cfg_root"

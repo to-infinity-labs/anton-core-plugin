@@ -5,6 +5,35 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-09-30
+
+### Added
+
+- `anton report health` warns about tasks whose due date or reminder is not a
+  `YYYY-MM-DD` date, since no date filter can match them. It only reports;
+  `anton task update --due` fixes a row.
+
+### Fixed
+
+- Updating no longer lets a still-running older Anton undo the new version's
+  graph stores: the update stops older background work first. Background
+  indexing now really runs at low priority and uses at most three cores by
+  default; 2.10.0's note promised this but applied it to only one kind of
+  background build.
+- Task dates must be real `YYYY-MM-DD` dates. `--due today` or
+  `--due 2026-13-45` on `task add` and `task update` (and the same for
+  `--reminder`, `--due-before` and `--due-on`) is refused with an error naming
+  the flag, instead of being stored where no query would ever find it.
+- When a setup command refuses to run, it reports the error once, on stderr.
+  It used to print it on stdout and then print a second, emptier error.
+- Database errors keep SQLite's own message, e.g.
+  `no such column: last_accessed`, instead of ending in a bare `internal`.
+- A stray word after a command is reported as an unknown command instead of an
+  internal error, or instead of being silently ignored — `task add bogus
+  --title x` no longer creates a task.
+- `system warm` and `maintenance` commands run without `--target` now say
+  `--target is required`.
+
 ## [2.10.0] - 2026-09-28
 
 ### Added
@@ -410,7 +439,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.7.0...v2.8.0

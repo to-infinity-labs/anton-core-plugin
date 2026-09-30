@@ -17,8 +17,8 @@ Single operator surface for `Task`-typed items — list pending work, add new to
 ## How
 
 ```
-anton task add --title "..." [--priority high|medium|low] [--due <YYYY-MM-DD>] [--reminder <ts>] [--tag <name> ...] [--owner <name>] [--group <name>] [--source-ref <id>] [--notes "..."]
-anton task list [--status pending|in_progress|completed] [--owner <name>] [--group <name>[,<name>...] | --all] [--due-before <date>] [--due-on <date>] [--limit N] [--ids-only]
+anton task add --title "..." [--priority high|medium|low] [--due <YYYY-MM-DD>] [--reminder <YYYY-MM-DD>] [--tag <name> ...] [--owner <name>] [--group <name>] [--source-ref <id>] [--notes "..."]
+anton task list [--status pending|in_progress|completed] [--owner <name>] [--group <name>[,<name>...] | --all] [--due-before <YYYY-MM-DD>] [--due-on <YYYY-MM-DD>] [--limit N] [--ids-only]
 anton task due [--mode overdue|today|soon|nudge-overdue|nudge-soon|reminders] [--owner <name>] [--group <name>] [--limit N]
 anton task groups
 anton task complete --id <task-id>
@@ -26,7 +26,7 @@ anton task update --id <task-id> [--title ...] [--status ...] [--priority ...] [
 anton config get --key owner
 ```
 
-The skill resolves natural-language dates ("tomorrow", "next monday", "in 3 days") before invoking the CLI; the handlers accept only ISO 8601 date strings. Default owner is read from `config.owner` via `anton config get --key owner`.
+The skill resolves natural-language dates ("tomorrow", "next monday", "in 3 days") before invoking the CLI; the handlers accept only ISO 8601 date strings and reject anything else as `invalid_argument`. Default owner is read from `config.owner` via `anton config get --key owner`.
 
 **Group idiom.** Groups are a bare partition label — there is no create step; a group springs into existence the first time a task carries it. An agent writes its workstream slice with `anton task add --group <workstream>` and queries it back the same way (`anton task list --group <workstream>`), spanning two workstreams in one call with `--group a,b`; `anton task groups` enumerates what exists. A task with no group belongs to the inbox, so the operator's bare `anton task list` returns only the inbox and stays clean of agent workstream residue. Alarms (`task due`) and the daily summary stay global across every group by design.
 

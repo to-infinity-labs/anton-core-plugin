@@ -280,6 +280,13 @@ _wrapper_src_err="$(mktemp "${TMPDIR:-/tmp}/anton-shim-src.XXXXXX" 2>/dev/null |
 # shellcheck source=lib/wrapper.sh disable=SC1091
 if ! source "$_script_dir/lib/wrapper.sh" 2>"$_wrapper_src_err"; then
     _src_status=$?
+    # The wrapper's own pin-drift refusal already carries its message and
+    # envelope; pass them through rather than recasting them.
+    if grep -q '"reason":"pin_drift_fatal"' "$_wrapper_src_err" 2>/dev/null; then
+        cat "$_wrapper_src_err" >&2
+        rm -f "$_wrapper_src_err"
+        exit 2
+    fi
     _src_msg=""
     if [[ -s "$_wrapper_src_err" ]]; then
         _src_msg="$(head -1 "$_wrapper_src_err" 2>/dev/null || true)"

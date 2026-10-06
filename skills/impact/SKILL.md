@@ -1,6 +1,6 @@
 ---
 name: impact
-description: Your blast-radius tool — every dependent of a symbol across calls, inheritance, references, and renders. Use for sizing impact before changing a symbol, and gestures like 'what if I change X'. Has a top-N ranking mode for the most-complex dependents.
+description: Lists every dependent of a symbol across calls, inheritance, references, and renders — its blast radius. Use for sizing impact before changing a symbol, and gestures like 'what if I change X'. Has a top-N ranking mode for the most-complex dependents.
 allowed-tools: Bash
 ---
 
@@ -32,7 +32,7 @@ anton graph query dependents-by-complexity --seed-id <id> \
   --depth N --min-cyc M --top-n K [--exclude-ambiguous] [--repo <slug>]
 ```
 
-Defaults live under the `code_graph.dbc_*` config namespace (`dbc_default_depth=5`, `dbc_default_min_cyc=5`, `dbc_default_top_n=30`). Nodes with `cyclomatic IS NULL` (non-function kinds, tier-2 languages without complexity infrastructure) drop out by construction; use the default `impact` shape for a complexity-agnostic enumeration. See the `impact` skill contract for the ranking-mode behaviour.
+Defaults live under the `code_graph.dbc_*` config namespace (`dbc_default_depth=5`, `dbc_default_min_cyc=5`, `dbc_default_top_n=30`). Nodes with `cyclomatic IS NULL` (non-function kinds, tier-2 languages without complexity infrastructure) drop out by construction; use the default `impact` shape for a complexity-agnostic enumeration.
 
 ## Output
 

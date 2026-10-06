@@ -1,6 +1,6 @@
 ---
 name: relate
-description: Assert or suppress a manual relationship edge between two memory items by id. Use when linking a note to what it supersedes, resolves, or is part of, or unlinking a wrong edge. Storage is directed; traversal reads it both ways.
+description: Asserts or suppresses a manual relationship edge between two memory items by id. Use when linking a note to what it supersedes, resolves, or is part of, or unlinking a wrong edge. Storage is directed; traversal reads it both ways.
 allowed-tools: Bash
 ---
 
@@ -43,7 +43,7 @@ anton item relate   --from ID --to ID[,ID…] --type T
 anton item unrelate --from ID --to ID[,ID…] --type T
 ```
 
-All three flags are required; `--to` takes one id or a comma-separated batch. `--from` and every target must resolve to a live item, and `--from` must not appear in `--to`. A bad id, a self-edge, or a duplicate target rejects the whole call in one transaction — no partial writes. Invoke through the plugin `anton` launcher (`bin/anton`); never a bare operator `core`, which bypasses the shim's pin gate.
+All three flags are required; `--to` takes one id or a comma-separated batch. `--from` and every target must resolve to a live item, and `--from` must not appear in `--to`. A bad id, a self-edge, or a duplicate target rejects the whole call in one transaction — no partial writes.
 
 ## Output
 

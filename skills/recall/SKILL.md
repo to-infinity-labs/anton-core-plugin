@@ -1,6 +1,6 @@
 ---
 name: recall
-description: Your primary tool for finding anything saved — text, code symbols, prior sessions. Use for loading context before non-trivial work, finding a symbol with `--code` rather than grep, and lookups like 'find' or 'where is X defined'. Reach for it before grep.
+description: Finds anything saved — notes, code symbols and prior sessions. Use for loading context before non-trivial work, finding a symbol with --code, and lookups like 'find' or 'where is X defined'.
 allowed-tools: Bash
 ---
 
@@ -18,7 +18,8 @@ Runs a fused search over the unified store — vector KNN, dual FTS across title
 
 ```
 anton memory recall [--query <text>] [--code] [--include-tests] [--docs] [--all] [--repo <slug>] [--on-error] [--include-types t1,t2] [--type T]... [--tag T]... [--recent] [--include-completed] [--limit N] [--explain] [--no-bump] [--session-id <sid>] [--format json|text]
-anton repos add <path> [--no-sync]
+anton repos add <path> [--type repo|parent] [--no-sync]
+anton repos add --discover [--base-dir <dir>]
 anton repos sync [--source <slug>]
 ```
 

@@ -1,37 +1,33 @@
 ---
 name: setup
-description: State-aware concierge for the full anton-core install lifecycle. Use for "set up", "install anton-core", "initialize", "re-run setup", "configure anton-core", "update anton-core", "repair anton-core", "check anton-core status", or "uninstall anton-core".
+description: Manages the anton-core install lifecycle, probing state before it acts. Use when the operator wants to install, check, update, repair, reconfigure, or uninstall anton-core, or after a plugin update ships a newer routing fragment.
 allowed-tools: Read, Edit, Bash, AskUserQuestion
+disable-model-invocation: true
 ---
 
-## What it does
+## Contract
 
-State-aware installer and lifecycle surface for anton-core. On invocation it runs a **state probe** (`anton setup probe` — no install-state change; the skill records one classification line to the events log), classifies the install (fresh / healthy-current / update-available / partial), and either runs a clean first-time setup straight through or opens a guided menu (Health check · Reconfigure · Update or Repair · Uninstall). Mechanical plumbing — binary bootstrap, data-root persistence, the operator-shell launcher, the version-pin verify-back gate, the bootstrap-lock — runs silently behind four named progress stages. Supports `--check` (status, no install-state change), `--re-onboard`, and `--uninstall [--purge-data]`. Every binary call routes through the `anton` command — the plugin's `bin/`-on-PATH launcher into the plugin's own tree — which never fetches: on a missing binary it emits a `binary_missing_run_setup` precondition envelope and exits non-zero. The one exception is `anton bootstrap`, the launcher's single fetch intercept: the synchronous per-platform binary fetch runs ONLY here under setup, through that intercept (the fetch runs only under setup, and hooks answer or enqueue rather than fetching). Two adjacent operator verbs sit outside this concierge flow and are invoked directly: `setup install-daemon` renders and installs the watch-daemon supervisor unit (launchd/systemd), and `setup uninstall-daemon` removes it.
+Installs, checks, updates, repairs, reconfigures or uninstalls anton-core. It runs a **state probe** (`anton setup probe`, no install-state change), classifies the install (fresh / healthy-current / update-available / partial), then runs a fresh install straight through or opens a guided menu (Health check · Reconfigure · Update or Repair · Uninstall). Flags: `--check` (status, no install-state change), `--re-onboard`, `--uninstall [--purge-data]`. An install, repair or update is done when the health check is not `critical` and the completion card is shown; `--check`, Health check, Reconfigure and Uninstall are done when their own section completes.
 
-## When to use
-
-- "set up", "install anton-core", "initialize", "re-run setup", "configure anton-core"
-- "update anton-core", "repair anton-core", "check status", `/anton-core:setup`
-- "uninstall anton-core"
-- After a plugin update that ships a newer `claude-md-fragment.md`
+Every binary call goes through the `anton` launcher, which never fetches: a missing binary answers with a `binary_missing_run_setup` envelope. The one fetch is `anton bootstrap`, run only here. `setup install-daemon` and `setup uninstall-daemon` (the watch-daemon supervisor unit) are invoked directly, outside this flow.
 
 ## Conventions (apply throughout)
 
-- Every binary call routes through `anton <verb>` — the plugin's `bin/anton` launcher, on the Bash PATH whenever the plugin is enabled, exec'ing `scripts/core`. Never invoke a bare `core` from this body — that name is the operator-shell launcher, which bypasses the shim's pin gate.
+- Every binary call routes through `anton <verb>` — the plugin's `bin/anton` launcher, on the Bash PATH whenever the plugin is enabled, exec'ing `scripts/core`. Never invoke a bare `core` from this body — setup retires that command, and whatever still answers to the name bypasses the shim's pin gate.
 - `anton fragment apply` is the only mutator for the `~/.claude/CLAUDE.md` *fragment*; the install/update/repair flow never edits it directly. Every step is a no-op when its precondition already holds.
 - Operator prompts use `AskUserQuestion` (never stdin).
 - Voice: neutral, warm, concise — no persona.
 
 ### Operator experience (apply throughout)
 
-The person installing this may not be technical. Everything they see follows these rules — no exceptions, at every step of every flow in this skill:
+The person installing this may not be technical. Everything they see follows these rules:
 
-- **Plain language only.** Never show the operator raw file paths, JSON envelopes, `reason=` tokens, exit codes, environment variables, or shell output. Those exist for you and for bug reports — not for narration. The numbered mechanics throughout this skill are **internal execution notes: never read them aloud**; the operator sees only stage banners, short progress phrases (a few words per step, e.g. "Downloading the assistant's engine… done"), and — on failure — the failure card below.
+- **Plain language only.** Never show the operator raw file paths, JSON envelopes, `reason=` tokens, exit codes, environment variables, or shell output. Those exist for you and for bug reports — not for narration. The exceptions are named where they occur: the `autoMemoryEnabled` conflict sentence and the native-memory opt-out (Step 4c), the shell-RC line (Step 5), the `maintenance reindex` note (Onboarding) and the `/plugin uninstall` reminder (Uninstall). The numbered mechanics throughout this skill are **internal execution notes: never read them aloud**; the operator sees only stage banners, short progress phrases (a few words per step, e.g. "Downloading the assistant's engine… done"), and — on failure — the failure card below.
 - **Every failure renders a three-part card**, nothing else:
   1. *What happened* — one plain sentence ("I couldn't download the assistant's engine.").
   2. *What I'm doing about it* — the retry, fallback, or skip you are taking ("I'll retry once" / "I'm skipping this optional step and continuing").
-  3. *What you can do* — the single action left to the operator, which is usually "nothing". When the problem needs the developer, END the card with one copyable line — `report code: <reason token> — please send this to the developer` — and that line is the ONLY place a machine token may appear.
-- **Setup never delegates plumbing to the operator.** Never ask them to set environment variables, edit files, run diagnostic commands, visit GitHub, or file issues. If setup cannot proceed, say so in one sentence, produce the report line yourself, and stop cleanly.
+  3. *What you can do* — the single action left to the operator, which is usually "nothing". When the problem needs the developer, end the card with one copyable line — `report code: <reason token> — please send this to the developer` — the only place a machine token appears.
+- **Setup never delegates plumbing to the operator.** Beyond the exceptions above, never ask them to set environment variables, edit files, run diagnostic commands, visit GitHub, or file issues. If setup cannot proceed, say so in one sentence, produce the report line yourself, and stop cleanly.
 - **Optional means silent.** A failed optional step (shell access, telemetry lines, token lookup) gets at most one gentle sentence — or nothing — never a card.
 
 ### Paste-input normalization (every operator-pasted string)
@@ -39,7 +35,7 @@ The person installing this may not be technical. Everything they see follows the
 1. Strip leading/trailing whitespace (ASCII space, tab, `\r`, `\n`, `\v`, `\f`).
 2. Convert CRLF and lone CR to `\n`.
 3. Reject any paste containing non-printable bytes other than `\n` / `\t` — re-prompt once, then abort the step on a second occurrence.
-4. For newline-separated pastes (repos), split AFTER normalization, trim each line, drop empties.
+4. For newline-separated pastes (repos), split after normalization, trim each line, drop empties.
 
 ## Step 0 — Argument triage & flag validation
 
@@ -52,7 +48,7 @@ Parse the invocation args for `--check`, `--uninstall`, `--purge-data`, `--re-on
 Then route:
 
 - `--uninstall` present → jump to **Uninstall**; do not run the probe-driven menu.
-- `--check` present → run **Step 1 (State probe)**. Print the classification; when `data_root.db_present`, also print the health readout from `anton report health --full` (the health overlay already fetched it for a `healthy-current` box — reuse that result; for any other class, fetch it once here). On a fresh box there is no database to report on, so print "fresh — nothing installed yet". Run the `--check` shell-command preview from Step 1 when a symlink state is outside `{ours, absent}`. Then exit without changing install state. (`--check` makes no install-state change: on an installed box it may append a health-log row and one classification line to the events log — both append-only observations; on a fresh box it writes nothing at all, since the probe verb never opens a database and the telemetry line is gated on the database existing.)
+- `--check` present → run **Step 1 (State probe)**. Print the classification; when `data_root.db_present`, also print the `anton report health --full` readout (reuse the overlay's result on a `healthy-current` box; fetch it once otherwise). On a fresh box print "fresh — nothing installed yet". Run Step 1's shell-command preview when a symlink state is outside `{ours, absent}`. Then exit. `--check` changes no install state: an installed box may append a health-log row and one classification line (append-only observations); a fresh box writes nothing.
 - otherwise → run **Step 1 (State probe)**, then **Step 2 (Routing)**.
 
 ## Step 1 — State probe (no install-state change)
@@ -70,6 +66,7 @@ Parse from `data` (no recomputation — these are the routing inputs verbatim):
 - `onboarding_shown` (`null` when no database exists to record it).
 - `symlinks.anton`, `symlinks.legacy_core` — each `ours` / `dangling` / `foreign` / `absent`.
 - `path_on_path`.
+- `statusline.installed` — whether Claude Code's status line already pipes through anton (Step 4d).
 
 **Health overlay (the one skill-side clause).** When `classification == "healthy-current"` and `data_root.db_present`, run `anton report health --full` and read `report.severity`; a `severity == "critical"` re-routes as **partial** (severity is a health-subsystem judgment the file-stat classifier cannot make). No other classification consults health here.
 
@@ -79,7 +76,7 @@ Parse from `data` (no recomputation — these are the routing inputs verbatim):
 anton event log --source setup --severity info --type SETUP_CLASSIFIED --subject <classification> --detail "provenance=<provenance> fragment=<fragment.status> shipped=<fragment.shipped_version> link=<symlinks.anton>"
 ```
 
-When the database is absent (a truly-fresh box, or the missing-binary envelope), DEFER this line to Stage 1 — recorded once after `anton db init` materializes the databases (see Step 3e). A failed `event log` is a one-line warning, never a block. This is the only thing the probe path writes, and it is an append-only observation — not an install-state change.
+When the database is absent (a truly-fresh box, or the missing-binary envelope), defer this line to Stage 1 — recorded once after `anton db init` materializes the databases (see Step 3e). A failed `event log` is a one-line warning, never a block. This is the only thing the probe path writes, and it is an append-only observation — not an install-state change.
 
 **`--check` shell-command preview.** In `--check` mode, when either `symlinks.anton` or `symlinks.legacy_core` is outside `{ours, absent}`, additionally run `anton setup link-shell --dry-run --format json` and render one plain sentence naming what a repair would do (e.g. "The `anton` shell command needs repointing — Repair will fix it."). The dry run makes no install-state change, so `--check`'s no-change contract holds.
 
@@ -87,7 +84,7 @@ When the database is absent (a truly-fresh box, or the missing-binary envelope),
 
 Match in order (first match wins):
 
-- **fresh** → run **Install** (Steps 3–7) straight through; no menu. `--re-onboard` does **not** short-circuit here: a fresh box has no seeded database for `repos add` / `item bulk-import` to write to, and Install runs onboarding un-gated as its Step 6 anyway, so an explicit `--re-onboard` on a fresh box is subsumed by the full install.
+- **fresh** → run **Install** (Steps 3–7) straight through; no menu. `--re-onboard` does not short-circuit here: Install runs onboarding un-gated anyway, and a fresh box has no database for `repos add` / `item bulk-import` until it does.
 - **`--re-onboard`** (non-fresh, no menu) → **Onboarding** directly (un-gated).
 - **non-fresh** → render an `AskUserQuestion` menu that names the detected state, with options ordered by class:
   - healthy-current → Health check (recommended) · Reconfigure · Update or Repair · Uninstall
@@ -104,7 +101,7 @@ Print `Step 1 of 4 — Foundation (getting the assistant's engine in place)`. Th
 
 a. **Binary install (fresh box only).** When the probe classified **fresh** (or returned the missing-binary envelope), fetch and rotate the binary in:
    1. `anton bootstrap` — the setup-only synchronous fetch, and the launcher's single bootstrap intercept: it downloads + checksum/cosign-verifies the per-platform release binary, stages it in the versioned self-update slot, writes the prefetch record, and on a fresh box seeds the operator config with the data root. On a non-zero exit render the **failure card** (Operator experience contract): "I couldn't download the assistant's engine" / what you're doing about it / the `report code:` line carrying the machine-parseable `reason=<…>` from stderr — then stop (nothing downstream can run without a binary).
-   2. `anton update apply-if-staged` — rotates the just-staged slot to the live-binary pointer and writes the first pin (the ONLY pin writer). A non-zero exit renders the failure card ("I couldn't finish installing the engine") and stops.
+   2. `anton update apply-if-staged` — rotates the just-staged slot to the live-binary pointer and writes the first pin (the only pin writer). A non-zero exit renders the failure card ("I couldn't finish installing the engine") and stops.
 
    **Idempotent:** skip both when the probe classified anything other than fresh (a re-run, repair, or hook-bootstrapped box already has a resolvable binary). This step is a no-op on every non-fresh install.
 b. `anton db init` — materializes `core.db` + `events.db`, applies migrations, seeds DEFAULT_CONFIG (`INSERT OR IGNORE`). Idempotent. A non-zero exit renders the failure card ("I couldn't set up the assistant's memory") with the precondition `reason` on the report-code line, and stops.
@@ -117,16 +114,20 @@ e. **Deferred classification telemetry (fresh only).** When the probe classified
 Print `Step 2 of 4 — Connect to Claude (wiring the assistant into your instructions)`.
 
 a. `anton fragment apply` — applies the shipped routing fragment into `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md` between the `<!-- anton-core:start -->` / `<!-- anton-core:end -->` sentinels (replace-in-place when present, append when absent), then pins `fragment.version` with a read-back verify gate (all inside the verb). A non-zero exit renders the failure card ("I couldn't connect the assistant to your Claude instructions") with the `io_error` detail on the report-code line, and stops; on success print one friendly line (the envelope's `old_version → new_version` is internal).
+b. **Import native memory.** Unless `anton config get --key setup.native_memory.import_declined` reads `true`, run `anton item import-native --dry-run --format json`, which returns `{"status":"ok","dry_run":true,"scanned":2,"imported":0,"skipped_existing":1,"unparseable":[],"items":[{"path":"…","source":"<project-dir>/<file>","id":"","type":"feedback","action":"would_import"}],"degraded_no_vector":0,"warnings":[]}`. When `items` is non-empty (files not yet imported), show the counts by `items[].type` and confirm with one `AskUserQuestion` ("Bring the notes Claude Code saved on its own into the assistant's memory?"). On yes, run `anton item import-native --format json` and render `imported`, `skipped_existing` and `unparseable` in one line. On no, `anton config set --key setup.native_memory.import_declined --value true`. A failure is one gentle sentence, then continue.
+c. **Turn native memory off.** Unless `anton config get --key setup.native_memory.declined` reads `true`, run `anton setup native-memory --format json`, which returns `{"status":"ok","installed":true,"action":"written","path":"/…/.claude/settings.json","env_disabled":false}`. On `action: written`, print one line ("Claude Code's own memory is now off — the assistant keeps your notes."). On `action: conflict`, write one sentence naming the explicit `autoMemoryEnabled: true` in the operator's Claude settings, which setup leaves as it is. On `already_disabled`, say nothing. When the operator asks to keep Claude Code's own memory, give them the opt-out: `anton config set --key setup.native_memory.declined --value true`, then `anton setup native-memory --remove`. This skill never writes `declined`. A failure renders the failure card with the `io_error` detail on the report-code line, then continue.
+
+d. **Plan headroom (optional).** Skip when the probe's `statusline.installed` is `true`. Otherwise ask one `AskUserQuestion`: "Capture plan headroom from Claude Code's status line?" — how much of the 5-hour and 7-day plan windows is used and when each resets, which only Claude Code's status line carries. On yes, run `anton setup statusline --format json`, which returns `{"status":"ok","action":"installed","path":"/…/.claude/settings.json","command":"/…/data/versions/current usage statusline | { ~/.claude/scripts/context-bar.sh\n}"}`. The verb puts `<data-root>/data/versions/current usage statusline` at the head of a pipe in front of the operator's existing `statusLine.command`, grouped as `{ <cmd> }` so every part of a compound command reads the input: it passes the status-line JSON through byte-for-byte, closes its output before recording anything, and never blanks the line on a capture fault. With no status line configured, it installs the compact `usage statusline --line` readout (`5h 26% · 7d 44%`) instead. On `installed`, print one line ("Plan headroom will show in `/anton-core:usage` once Claude Code next draws its status line."); on `already_installed`, say nothing. `anton setup statusline --remove` strips exactly what it added (`removed`, or `not_installed` when the pipe is absent) and Uninstall runs it. On no, write nothing; the operator can run `anton setup statusline` later. A failure — `precondition_missing` when the live binary is not in place — is one gentle sentence, then continue.
 
 ### Step 5 — Stage 3: Shell access (optional)
 
 Print `Step 3 of 4 — Shell access (optional: the "anton" command for your terminal)`. The whole stage is convenience; per the Operator experience contract, any failure here gets at most one gentle sentence, then continue.
 
-a. `anton update status >/dev/null 2>&1` — materializes the live-binary pointer (read-only; runs the one-shot legacy→versioned migration). The next call gates on that pointer but never creates it, so this call comes first.
+a. `anton update status >/dev/null 2>&1` — makes sure the live-binary pointer exists (read-only). On a fresh install Step 3a's `apply-if-staged` already wrote it, so this is a no-op; on a host still carrying the legacy `data/bin/anton-core-v<version>` layout, it runs the one-shot migration that writes it. The next call gates on that pointer but never creates it, so this call comes first.
 b. `anton setup link-shell --format json` — installs the operator-shell launcher and points the `anton` command at it (the four-branch site decision), retiring the legacy `core` command site. Render from the envelope, then continue no matter what:
    - `symlink.branch == "refused"` → one gentle sentence naming the conflict ("Something else already owns the `anton` command name — leaving it untouched."), then continue.
    - `legacy_core == "removed"` → one line: "Retired the old `core` shell command — it's `anton` everywhere now."
-   - `path_on_path == false` → print the shell-RC line to add (`export PATH="$HOME/.local/bin:$PATH"`) — do NOT edit the shell-RC.
+   - `path_on_path == false` → print the shell-RC line to add (`export PATH="$HOME/.local/bin:$PATH"`); the operator adds it, and setup leaves the shell-RC file untouched.
    - a `current_unresolved` or `io_error` refusal (exit 3 / exit 5) → one gentle optional-stage sentence, then continue (the stage is convenience; nothing downstream depends on it).
 
 ### Step 6 — Stage 4: Your content (onboarding)
@@ -139,7 +140,7 @@ Print `Step 4 of 4 — Your content (repositories and knowledge, all optional)`.
 
 ## Onboarding (sub-flow)
 
-Render ONE `AskUserQuestion` panel collecting the steps below; **omit any step whose `onboarding.<step>.declined` reads `true`** unless `--re-onboard` is set:
+Render one `AskUserQuestion` panel collecting the steps below (the follow-up questions under **Execute** come after it); **omit any step whose `onboarding.<step>.declined` reads `true`** unless `--re-onboard` is set:
 
 - **Repos:** "Register repositories with anton-core? Paste absolute paths, one per line, or Skip."
 - **Knowledge:** "Bulk-import a knowledge directory? Absolute path, or Skip."
@@ -153,17 +154,17 @@ Render ONE `AskUserQuestion` panel collecting the steps below; **omit any step w
 - **Import:** `anton item bulk-import --path <dir> --recursive --dry-run --format summary`. On `file_count == 0`, report and continue. Otherwise render `file_count` + `by_type`, confirm via a second `AskUserQuestion`, then re-run without `--dry-run` and render `imported` / `skipped` / `errors`; when `degraded_no_vector` > 0, add a one-line note ("N file(s) imported without a vector — a tokenizer issue; searchable by text, re-runnable via `maintenance reindex`").
 - **Shell access:** if "Yes" and not already linked, run `anton setup link-shell --format json` (the same verb Stage 3 runs) and render from its envelope as in Step 5.
 
-**Persist declines:** for each Skipped step, `config set --key onboarding.<step>.declined --value true`. For each completed step, clear it with `config set --key onboarding.<step>.declined --value ""`.
+**Persist declines:** for each Skipped step, `anton config set --key onboarding.<step>.declined --value true`. For each completed step, clear it with `anton config set --key onboarding.<step>.declined --value ""`.
 
 `anton onboarding mark-shown` (failure is a warning).
 
 ## Repair (sub-flow)
 
-Re-run Steps 3–6 gated on their preconditions, narrating ONLY what was out of sync (e.g. "Symlink was dangling — repointed."). Steps already in order stay silent. The fragment step runs `fragment apply`; narrate "Routing fragment restored." only when the verb reports `applied: true`. Read `old_version`/`new_version` from the envelope for the narration line. End with Step 7.
+Re-run Steps 3–6 gated on their preconditions, except Step 4d, which only install runs (repair never re-asks the plan-headroom question), narrating only what was out of sync (e.g. "Symlink was dangling — repointed."). Steps already in order stay silent. The fragment step runs `fragment apply`; narrate "Routing fragment restored." only when the verb reports `applied: true`. Read `old_version`/`new_version` from the envelope for the narration line. Steps 4b and 4c narrate only a change: an `imported` count above zero, or `action: written`. End with Step 7.
 
 ## Update (sub-flow)
 
-Run `fragment apply` (fragment refresh + re-pin) and Stage 3 (launcher refresh); SKIP onboarding. Read `old_version`/`new_version` from the verb envelope and report "Routing updated v<old_version> → v<new_version>." End with Step 7.
+Run `fragment apply` (fragment refresh + re-pin), Steps 4b and 4c, and Stage 3 (launcher refresh); skip onboarding. Read `old_version`/`new_version` from the verb envelope and report "Routing updated v<old_version> → v<new_version>." Steps 4b and 4c narrate only a change, as in Repair. End with Step 7.
 
 ## Health verify (menu action)
 
@@ -190,9 +191,9 @@ When `--uninstall` is present (or chosen from the menu):
 2. **Scope (skip when `--purge-data` already given).** `AskUserQuestion`: "Remove anton-core, keep my data" (default) vs "Remove everything, erase my data" (⚠ also deletes `~/.anton-core/data` — saved knowledge, tasks, logs; no undo). The erase choice sets `--purge-data`.
 3. **Confirm.** Keep-data → a plain confirm listing each `removed[*]` path with humanized `bytes` and `kind`, the CLAUDE.md fragment-wipe callout (sentinel region is plugin-managed; hand-edits inside go with it), and the symlink-removal note. Erase-everything → require **typed confirmation**: "Type `erase` to confirm." Any other input cancels with zero mutation.
 4. **Breadcrumb before removal.** Append one line — `<ISO-8601 timestamp>\t<resolved paths>\t<total bytes>\t<scope>` — to `~/.anton-core/data/logs/uninstall.log`. Best-effort: a write failure is a warning, never a block.
-5. **Execute.** `anton setup uninstall [--purge-data] --format json` (acquires the bootstrap lock; the verb also reaps the operator-shell command sites itself and reports each under `symlinks[*]`). Then `Read` `~/.claude/CLAUDE.md`; if sentinels present, `Edit` to delete the marker pair + body.
-6. **Summary card.** Resolved paths removed, bytes freed (sum of `removed[*].bytes`), one line per operator-shell command site the verb reaped (from `symlinks[*]`: an `action: removed` site named as cleaned up, an `action: left_foreign` site named as left in place), the callout that per-project memory under `~/.claude/projects/.../memory/` is untouched, the callout that a subsequent install is treated as first-run, and the reminder to run `/plugin uninstall anton-core` to complete removal.
+5. **Execute.** `anton setup uninstall [--purge-data] --format json` (acquires the bootstrap lock; the verb also reaps the operator-shell command sites itself and reports each under `symlinks[*]`, and reverts the Claude settings setup wrote, reporting them under `claude_settings`). The verb leaves the fragment alone: `Read` the `CLAUDE.md` Step 4a wrote — `$CLAUDE_CONFIG_DIR/CLAUDE.md`, or `~/.claude/CLAUDE.md` when that is unset — and if sentinels are present, `Edit` to delete the marker pair + body.
+6. **Summary card.** Resolved paths removed, bytes freed (sum of `removed[*].bytes`), one line per operator-shell command site the verb reaped (from `symlinks[*]`: an `action: removed` site named as cleaned up, an `action: left_foreign` site named as left in place), one line per `claude_settings` value other than `absent`/`skipped` (`auto_memory: reverted` → Claude Code's own memory is back on; `left` → the operator's own setting stays; `profiler_env: removed` → the token-profiler setting is removed; `statusline: removed` → Claude Code's status line no longer pipes through anton; `error` → one gentle sentence naming the setting not reverted), the callout that Claude Code's per-project native memory files stay on disk and the setting reverts only if setup wrote it, the callout that a subsequent install is treated as first-run, and the reminder to run `/plugin uninstall anton-core` to complete removal.
 
 ## Behavior
 
-After a successful install, `core.db` + `events.db` exist under the data root, schema'd and seeded; `~/.claude/CLAUDE.md` carries the fragment between the sentinel pair; `~/.local/bin/anton` (when creation succeeded) points at the operator-shell launcher and the legacy `~/.local/bin/core` command site is retired; `anton config get --key fragment.version` returns the shipped version. Re-running is idempotent — the probe + menu make no install-state change (they may append observation logs only) and every execution step is a no-op when its precondition holds. Spec: the `setup` skill contract.
+After a successful install, `core.db` + `events.db` exist under the data root, schema'd and seeded; the Claude config dir's `CLAUDE.md` (`$CLAUDE_CONFIG_DIR`, default `~/.claude`) carries the fragment between the sentinel pair; `~/.local/bin/anton` (when creation succeeded) points at the operator-shell launcher and the legacy `~/.local/bin/core` site is retired; `anton config get --key fragment.version` returns the shipped version; Claude Code's `autoMemoryEnabled` is `false` in that dir's `settings.json` unless the operator opted out or set it `true` themselves. Re-running is idempotent: the probe and menu change no install state, and every execution step is a no-op when its precondition holds.

@@ -1,6 +1,6 @@
 ---
 name: paths
-description: Your tool for enumerating directed call-chain paths from one symbol to another. Use for tracing how A reaches B in an indexed repo instead of walking by hand, and gestures like 'path from A to B' or 'shortest call chain to X'. Use `callers` or `callees` for fan-out.
+description: Enumerates directed call-chain paths from one symbol to another. Use for tracing how A reaches B in an indexed repo instead of walking by hand, and gestures like 'path from A to B' or 'shortest call chain to X'. Use `callers` or `callees` for fan-out.
 allowed-tools: Bash
 ---
 

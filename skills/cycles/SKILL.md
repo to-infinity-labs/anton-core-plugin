@@ -1,6 +1,6 @@
 ---
 name: cycles
-description: Your tool for finding circular dependencies in the code graph. Use for checking a package or module for dependency cycles in an indexed repo, and gestures like 'are there cycles in X'. Reach for it instead of manual tracing.
+description: Finds circular dependencies in the code graph. Use for checking a package or module for dependency cycles in an indexed repo instead of manual tracing, and gestures like 'are there cycles in X'.
 allowed-tools: Bash
 ---
 

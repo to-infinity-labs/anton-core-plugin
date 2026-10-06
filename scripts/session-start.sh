@@ -26,7 +26,7 @@ if [[ -f "$PIN_FILE" ]]; then
     _pin_ver="${_pin_ver//$'\n'/}"
     ANTON_BIN="${CLAUDE_PLUGIN_DATA}/data/versions/v${_pin_ver}/anton-core"
     if [[ ! -x "$ANTON_BIN" ]]; then
-        printf '⚠ pin names a missing binary slot v%s; operator action required\n' "$_pin_ver" >&2
+        printf '⚠ pin names a missing binary slot v%s; restore it with: anton bootstrap --version v%s\n' "$_pin_ver" "$_pin_ver" >&2
         printf '{"status":"error","error":{"kind":"internal","reason":"pin_drift_fatal","pinned_version":"v%s"}}\n' "$_pin_ver" >&2
         exit 2
     fi

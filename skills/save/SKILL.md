@@ -1,6 +1,6 @@
 ---
 name: save
-description: Your tool for persisting durable knowledge — the write-side memory layer that supersedes native memory files. Use for capturing a fact, decision, or correction worth keeping, and gestures like 'save this' or 'remember this'. Write here, not to memory files.
+description: Saves a durable fact, decision or correction to the knowledge base, in place of Claude Code's native auto memory. Use for capturing anything worth keeping across sessions, and gestures like 'save this' or 'remember this'.
 allowed-tools: Bash
 ---
 
@@ -17,10 +17,10 @@ Single entry point for content entering the knowledge base. Auto-categorises pas
 ## How
 
 ```
-anton item save [--source-path <file> | --items-json <array> | --items-file <file> | --type T --title T --content C [--summary S] [--tags a,b,c] [--importance F]]
+anton item save [--source-path <file> | --items-json <array> | --items-file <file> | --type T --title T --content C [--summary S] [--importance F]] [--tag <name> ...]
 ```
 
-Three modes share one verb. `--source-path` runs the full intake pipeline against a file on disk. `--items-json` (or `--items-file`) writes a pre-parsed batch straight through reconcile and write. `--type` + `--title` + `--content` is the single-item shorthand for narrative the operator already has typed up; it also accepts `--summary`, `--tags` (comma-separated — note this verb takes a CSV list, unlike the repeatable `--tag` on `task add`), and `--importance` (`[0.0, 1.0]`, default `1`). Give `--type` a canonical type — `document`, `reference`, `project`, `feedback`, `note`, `fact`, `decision`, or `question`; an unrecognized value is coerced to `note` (a known synonym folds to its target) and the original is preserved on a `raw_type:` tag, so a save never fails on an unexpected type.
+Three modes share one verb. `--source-path` runs the full intake pipeline against a file on disk. `--items-json` (or `--items-file`) writes a pre-parsed batch straight through reconcile and write. `--type` + `--title` + `--content` is the single-item shorthand for narrative the operator already has typed up; it also accepts `--summary` and `--importance` (`[0.0, 1.0]`, default `1`). `--tag` (repeatable; one tag per occurrence) applies in every mode: each tag is merged into each item's tags and deduplicated. Give `--type` a canonical type — `document`, `reference`, `project`, `feedback`, `note`, `fact`, `decision`, or `question`; an unrecognized value is coerced to `note` (a known synonym folds to its target) and the original is preserved on a `raw_type:` tag, so a save never fails on an unexpected type.
 
 ## Relate on save
 
@@ -28,7 +28,7 @@ Mode 3 also accepts `--relate <type>:<target-id>` (comma-separated or repeated) 
 
 ## Output
 
-Success envelope reports `status`, `written` (id list), `extracted`, `noop`, `rejected`, `type` (primary item type), `source_path`, `errors`, `warnings`, and `meta_used`, plus `saved_path` on a Mode 1 source copy and `relations_written` when `--relate` was supplied (the count of edges written with the item — the full set on a fresh item, `0` when the item deduped onto an existing row so no source landed for the edges to attach to). `item save` returns `{"status":"ok","source_path":"...","type":"...","extracted":[...],"written":[...],"noop":<false|[...]>,"rejected":N,"degraded_no_vector":N,"errors":[...],"warnings":[...],"meta_used":<true|false>}`. Contract: `item-save` in the anton-core CLI contract.
+Success envelope reports `status`, `written` (id list), `extracted`, `noop`, `rejected`, `type` (primary item type), `source_path`, `degraded_no_vector` (items a configured embedder left partly or wholly vectorless), `errors`, `warnings`, and `meta_used`, plus `saved_path` on a Mode 1 source copy and `relations_written` when `--relate` was supplied (the count of edges written with the item — the full set on a fresh item, `0` when the item deduped onto an existing row so no source landed for the edges to attach to). `item save` returns `{"status":"ok","source_path":"...","type":"...","extracted":[...],"written":[...],"noop":<false|[...]>,"rejected":N,"degraded_no_vector":N,"errors":[...],"warnings":[...],"meta_used":<true|false>}`. Contract: `item-save` in the anton-core CLI contract.
 
 ## Curation
 

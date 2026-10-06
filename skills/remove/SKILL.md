@@ -1,6 +1,6 @@
 ---
 name: remove
-description: Remove one item from the knowledge base by id, title, or fuzzy keyword. Use for "remove from kb", "delete this id", "forget this", or undoing a prior save.
+description: Removes one item from the knowledge base by id, title, or fuzzy keyword. Use for "remove from kb", "delete this id", "forget this", or undoing a prior save.
 allowed-tools: Bash
 ---
 
@@ -20,7 +20,7 @@ Removes one item from the knowledge base, cleaning every dependent row across th
 anton item delete --id <id> [--dry-run]
 ```
 
-The skill's user-facing surface is `remove`; the underlying cobra verb is `delete`. An operator typing the verb directly should use `delete`. The skill itself routes through `delete` transparently after resolving the identifier (via `recall` for fuzzy matches).
+The skill's user-facing surface is `remove`; the underlying CLI verb is `delete`. An operator typing the verb directly should use `delete`. The skill itself routes through `delete` transparently after resolving the identifier (via `recall` for fuzzy matches).
 
 ## Output
 

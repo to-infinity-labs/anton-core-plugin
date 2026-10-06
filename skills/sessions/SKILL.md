@@ -1,6 +1,6 @@
 ---
 name: sessions
-description: Browse past Claude Code session stats, history, and applied improvements. Use for "session stats", "how did my sessions go", or "what skills did I use". Pairs with `improvements` (action queue).
+description: Browses past Claude Code session stats, history, and applied improvements. Use for "session stats", "how did my sessions go", or "what skills did I use". Pairs with `improvements` (action queue).
 allowed-tools: Bash
 ---
 

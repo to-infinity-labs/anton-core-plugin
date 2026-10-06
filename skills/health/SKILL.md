@@ -1,6 +1,6 @@
 ---
 name: health
-description: Diagnostic dashboard for anton-core's subsystems. Use for "health", "status", "is it working", or as a verification step after setup.
+description: Reports the health of anton-core's subsystems — overall severity, per-subsystem checks and repair commands. Use for "health", "is it working", "system check", or as a verification step after setup.
 allowed-tools: Bash
 ---
 
@@ -10,7 +10,7 @@ Read-only diagnostic surface. Composes per-subsystem panels (memory invariants, 
 
 ## When to use
 
-- "health", "status", "is it working"
+- "health", "is it working"
 - "system check", "diagnostics", `/anton-core:health`
 - Verification step after `/anton-core:setup` or before a long session
 
@@ -22,6 +22,14 @@ anton report health [--full] [--trend]
 
 Default invocation returns the roll-up only: overall `severity`, the per-subsystem `checks` array (each carrying a remediation hint when not healthy), and a one-line `summary`. `--full` adds the `counts`, `memory`, `remediation`, and `system` breakdown panels; `--trend` adds the ten-row trend rollup from `events.health_log` classifying each panel as Improving / Stable / Degrading.
 
+```
+anton report recall --days 30
+```
+
+A retrieval diagnostic beside the health report: expands per recall over the window and the window of equal length before it. Directional only — no panel or threshold reads it, so present it as a trend, never a verdict.
+
 ## Output
 
-Single standard result envelope. In its default form `report health` returns `{"status":"ok","report":{"severity":"<healthy|warning|critical>","checks":[...],"summary":"..."}}` — only `severity`, `checks`, and `summary` are always present. `--full` extends `report` with the `counts`, `memory`, `remediation`, and `system` panels; each `remediation` hint may include a `fix` command (e.g. `anton maintenance repair --target fts`), which the readout surfaces verbatim so the operator can run the repair directly. Severity rolls up per-panel statuses: any `critical` → `critical`; any `warning` or `degraded` → `warning`; otherwise `healthy`. The `extractor` check carries nine consolidation facts on every measured run — `consolidation_backlog_items` (items created since the link pass last advanced its cursor, the unscanned window rather than the pair backlog), `consolidation_backlog_age_days` (whole days since the oldest item past that cursor was created), `judged_pairs_total`, `judged_pairs_last_pass`, `judge_refusals_total`, `consolidation_unverdicted_pairs` (pairs awaiting a retry after the judge gave no verdict), `consolidation_unjudgeable_pairs` (pairs retired after failing alone at the attempt cap — `maintenance reset --target judged-unjudgeable` reopens them), `last_pass_judge_tokens` (input plus output tokens on the newest link and dream judge rows — the session window, which runs out before the dollar budget does), and `consolidation_judge_arm` (`live` or `stub`) — and reports `warning` when the last three link passes all stopped with their window unfinished, on ANY stop reason rather than the budget alone, and all settled nothing new. The remediation `fix` walks the arm first (on `stub` no engine is bound, so the backlog is waiting rather than stalled), then the pass's `stop_reason`, and reaches `link.max_budget_usd` only if a `consolidate --dry-run` estimate exceeds it. A read failure never manufactures a stall and never hides one: the nine facts are withheld together and replaced by `consolidation_facts_error` (the last-consolidation banner by `last_consolidation_error`), so an unreadable store is distinguishable from a healthy one and from a check with no store wired, whose keys are simply absent. Contract: `report-health` in the anton-core CLI contract.
+Single standard result envelope. In its default form `report health` returns `{"status":"ok","report":{"severity":"<healthy|warning|critical>","checks":[...],"summary":"..."}}` — only `severity`, `checks`, and `summary` are always present. `--full` extends `report` with the `counts`, `memory`, `remediation`, and `system` panels; each `remediation` hint may include a `fix` command (e.g. `anton maintenance repair --target fts`), which the readout surfaces verbatim so the operator can run the repair directly. Severity rolls up per-panel statuses: any `critical` → `critical`; any `warning` or `degraded` → `warning`; otherwise `healthy`. The `extractor` check carries nine consolidation facts on every measured run — `consolidation_backlog_items` (items created since the link pass last advanced its cursor, the unscanned window rather than the pair backlog), `consolidation_backlog_age_days` (whole days since the oldest item past that cursor was created), `judged_pairs_total`, `judged_pairs_last_pass`, `judge_refusals_total`, `consolidation_unverdicted_pairs` (pairs awaiting a retry after the judge gave no verdict), `consolidation_unjudgeable_pairs` (pairs retired after failing alone at the attempt cap — `maintenance reset --target judged-unjudgeable` reopens them), `last_pass_judge_tokens` (input plus output tokens on the newest link and dream judge rows — the session window, which runs out before the dollar budget does), and `consolidation_judge_arm` (`live` or `stub`) — and reports `warning` when the last three link passes all stopped with their window unfinished, on any stop reason rather than the budget alone, and all settled nothing new. The remediation `fix` walks the arm first (on `stub` no engine is bound, so the backlog is waiting rather than stalled), then the pass's `stop_reason`, and reaches `link.max_budget_usd` only if a `consolidate --dry-run` estimate exceeds it. A read failure never manufactures a stall and never hides one: the nine facts are withheld together and replaced by `consolidation_facts_error` (the last-consolidation banner by `last_consolidation_error`), so an unreadable store is distinguishable from a healthy one and from a check with no store wired, whose keys are simply absent. Contract: `report-health` in the anton-core CLI contract.
+
+`report recall` returns `{"status":"ok","window_days":30,"clamped":false,"ttl_days":90,"current":{"from":"…","to":"…","recalls":306,"expands":88,"ratio":0.2876},"prior":{"from":"…","to":"…","recalls":280,"expands":91,"ratio":0.325},"delta":-0.0374}`. `ratio` and `delta` are `null` when a window has no recalls. When `2 × days` would reach past the logs' TTL the window is cut to half of `ttl_days` and `clamped` is `true`. Contract: `report-recall` in the anton-core CLI contract.

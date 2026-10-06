@@ -5,6 +5,97 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-06
+
+### Breaking
+
+- `anton item save` and `anton item update` take `--tag` once per tag, and a
+  comma stays part of the tag; `--tags` is gone. `anton task add --tag` no
+  longer splits a tag on commas either.
+
+### Added
+
+- `anton task list` returns each task's tags as a list (`tags`), so a tag
+  containing a comma can be told apart from two tags.
+- Setup now turns off Claude Code's own memory, so your notes live in one
+  place, and first offers to bring the notes Claude Code saved on its own
+  into the assistant's memory; that offer remembers a "no". Turning the
+  memory off is the default: to keep it, run `anton config set --key
+  setup.native_memory.declined --value true` and `anton setup native-memory
+  --remove`. A setting you set to `true` yourself is left alone and
+  reported. `anton setup
+  native-memory` and `anton item import-native` run the two steps directly;
+  uninstall turns Claude Code's memory back on if setup turned it off.
+- The health report shows whether Claude Code's own memory is off and how
+  many of its notes are not yet imported.
+- `anton usage span` shows where the time went (the model, waiting, idle
+  time and each kind of tool), how often and how far each session's context
+  was compacted, and tokens per kind of helper agent, with general-purpose
+  helpers listed by name.
+- The code graph indexes markdown headings and the links that point at them,
+  within a file or across files. Each existing graph is rebuilt once, in the
+  background, the first time it is read.
+- Your plan's usage limits are tracked: `anton setup statusline` adds
+  `anton usage statusline` to Claude Code's status line, which records the
+  5-hour and 7-day percentages it is sent. `anton usage stats` and the
+  dashboard's `/usage` page show them with their reset times, and say so
+  when the reading is old.
+- `anton usage doctor --all` checks every session's token figures at once,
+  and `--dry-run` shows what `--repair` would change without changing it.
+- `anton maintenance purge --target token-usage --before <YYYY-MM>` deletes
+  old months of token history; nothing else ever trims it, and the health
+  report warns when it grows large.
+- `anton report recall` shows how often recalls were followed by expands,
+  against the period before.
+
+### Changed
+
+- Dollar amounts read `$2,904.01` everywhere: in `anton usage stats`, the
+  dashboard and the health report.
+- Setup's data-folder step no longer erases other settings in
+  `~/.anton-core/config.json`.
+- The skills, the CLAUDE.md fragment and the text the assistant injects at
+  session start were reviewed against Anthropic's guidance and tightened.
+- Background AI jobs (extraction, scanned-PDF reading, linking, dreaming and
+  session summaries) run on Sonnet 5.5 instead of Haiku 4.5, and theme
+  synthesis and deep analysis on Opus 5.5, all at low effort. Each job has an
+  `*.effort` setting; a mistyped value is refused with an error naming it.
+- Session start shows at most three distinct suggested improvements, with a
+  count of the rest, and deep analysis no longer re-suggests what it already
+  suggested.
+
+### Fixed
+
+- The dashboard's daily token chart is readable in dark mode; its title,
+  legend and axis labels were drawn in black.
+- Hook commands show their real options in `--help` even before a data
+  folder is set up.
+- `anton graph query dependents-by-complexity --help` shows one default for
+  `--min-cyc` instead of two contradictory ones.
+- When saving a note that already exists with `--relate`, the warning gives
+  the full `anton item relate` command for each link you asked for.
+- Saving a note with tags keeps the tags however the note is saved; tags
+  given alongside a file or a batch of items were dropped.
+- Scanned PDFs are read again: the file path now reaches the model. Token
+  costs are priced correctly for Sonnet 5, Sonnet 5.5, Fable 5.1 and Mythos 5.1.
+- Daily maintenance now cleans up memory links whose type is not a real link
+  type even when that type contains a capital letter. Links written before
+  2.6.0 sometimes stored a whole sentence as their type ("Both address
+  CI-gating concerns…") or an uppercase `RESOLVES`. Maintenance skipped these
+  without reporting them, so `--rel-types` filters missed them. They are now
+  retyped to `relates_to` (or `resolves`), and the original text is kept on
+  the link.
+- Saving a long note no longer warns that its text was truncated. Decisions,
+  key points and action items pulled from a saved document can be found by
+  meaning straight away, without waiting for a reindex. A note whose meaning
+  search could only partly be built is now picked up and finished by
+  `anton maintenance reindex`.
+
+### Removed
+
+- The `maintenance.unspecified_rel_threshold` setting. Nothing read it, and
+  the warning it described never existed. Upgrading deletes the stored value.
+
 ## [2.11.0] - 2026-09-30
 
 ### Added
@@ -439,7 +530,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.11.0...v3.0.0
 [2.11.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.8.0...v2.9.0

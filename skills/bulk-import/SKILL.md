@@ -1,12 +1,12 @@
 ---
 name: bulk-import
-description: Batch-import a directory of files into the knowledge base, resuming from a checkpoint on interruption. Use for "bulk import this folder", "import this directory", or "ingest this directory".
+description: Batch-imports a directory of files into the knowledge base, resuming from a checkpoint on interruption. Use for "bulk import this folder", "import this directory", or "ingest this directory".
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Walks a directory, classifies each file, and routes every file through the same intake pipeline as `save`. Updates a checkpoint after each success so an interrupted run resumes without redoing completed files. Two paths share one dispatcher: in-session orchestration with batched concurrency, and an out-of-session CLI executor for unattended runs.
+Walks a directory, classifies each file, and routes every file through the same intake pipeline as `save`, running the saves in concurrent batches itself. Updates a checkpoint after each success so an interrupted run resumes without redoing completed files. The same verb serves an in-session run after a dry-run preview and an unattended run from a shell.
 
 ## When to use
 

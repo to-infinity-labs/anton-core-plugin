@@ -1,6 +1,6 @@
 ---
 name: callees
-description: Your tool for finding every function a symbol calls, direct or transitive. Use for tracing what a function depends on in an indexed repo instead of grepping, and gestures like 'what does X call' or 'downstream of X'. Pairs with `callers` for the upstream direction.
+description: Finds every function a symbol calls, direct or transitive. Use for tracing what a function depends on in an indexed repo instead of grepping, and gestures like 'what does X call' or 'downstream of X'. Pairs with `callers` for the upstream direction.
 allowed-tools: Bash
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: tasks
-description: Add, list, complete, and update tasks in the operator's todo store. Use for "add task", "todo", "remind me to", "I need to", or "what tasks do I have".
+description: Adds, lists, completes, and updates tasks in the operator's todo store. Use for "add task", "todo", "remind me to", "I need to", or "what tasks do I have".
 allowed-tools: Bash
 ---
 
@@ -25,6 +25,8 @@ anton task complete --id <task-id>
 anton task update --id <task-id> [--title ...] [--status ...] [--priority ...] [--due ...] [--reminder ...] [--owner ...] [--group <name>] [--notes ...]
 anton config get --key owner
 ```
+
+`--tag` takes one tag per occurrence and a comma stays inside the tag: pass `--tag a --tag b` for two tags, never `--tag a,b`.
 
 The skill resolves natural-language dates ("tomorrow", "next monday", "in 3 days") before invoking the CLI; the handlers accept only ISO 8601 date strings and reject anything else as `invalid_argument`. Default owner is read from `config.owner` via `anton config get --key owner`.
 

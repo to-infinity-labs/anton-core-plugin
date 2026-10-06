@@ -1,6 +1,6 @@
 ---
 name: share
-description: Package the current conversation work into a self-contained markdown document, saved to disk and copied to clipboard. Use for "share this", "make this portable", or "package this up".
+description: Packages the current conversation work into a self-contained markdown document, saved to disk and copied to clipboard. Use for "share this", "make this portable", or "package this up".
 allowed-tools: Read, Write, Bash
 ---
 
@@ -16,6 +16,8 @@ Packages whatever the operator and assistant have been working on in the current
 
 ## Behavior
 
-This skill is **prompt-only** — no `core` CLI verb backs it. The handler is the assistant following the steps below; `How` / `Output` sections are omitted by design (see acceptance `A-plugin-4`).
+This skill is prompt-only: no `anton` verb backs it. Follow the steps below.
 
 The skill scans the live conversation for files created or modified, decisions made, commands run, gotchas surfaced, and configuration in play; picks 3–5 sections from a fixed pool (Overview, Setup Prompt, Config Files, Process / Steps, Findings, Decisions, Gotchas, Customization) by relevance; writes a self-contained markdown document under `~/.anton-core/data/docs/shared/<YYYY-MM-DD>-<slug>.md` with file contents verbatim in fenced code blocks; and copies the file to the system clipboard via the platform-specific adapter (`pbcopy` / `clip.exe` / `xclip`). `--dry-run` previews in chat first; `--no-clipboard` skips the clipboard copy.
+
+Write the shortest document that carries the decisions: state each fact once.

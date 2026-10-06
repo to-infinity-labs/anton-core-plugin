@@ -1,12 +1,12 @@
 ---
 name: explore
-description: Your tool for walking the relationship graph outward from one seed to every connected node. Use for mapping what surrounds a recall hit before acting, and gestures like 'what is related to X' or 'explore around X'. Pairs with `expand` to deepen a batch.
+description: Walks the relationship graph outward from one seed to every connected node. Use for mapping what surrounds a recall hit before acting, and gestures like 'what is related to X' or 'explore around X'. Pairs with `expand` to deepen a batch.
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Walks the relationship graph outward from one seed item and returns every node and edge reachable within a depth limit. Read-side companion to `expand`: `expand` deepens one batch of ids; `explore` widens around a single id. The walk is undirected by default and respects an optional relationship-type filter, so the skill can be pointed at structural code edges (`CALLS`, `EXTENDS`) or narrative memory edges (`RELATES_TO`, `DEPENDS_ON`). Bumps the seed's `access_count` and writes one row to `events.access_log` per invocation — the memory-side write that the read-only `graph query` surface cannot fire.
+Walks the relationship graph outward from one seed item and returns every node and edge reachable within a depth limit. Read-side companion to `expand`: `expand` deepens one batch of ids; `explore` widens around a single id. The walk is undirected by default and respects an optional relationship-type filter, so the skill can be pointed at structural code edges (`CALLS`, `EXTENDS`) or memory edges (`relates_to`, `supersedes`, `part_of`, `resolves`). The filter matches the stored type exactly, so pass it in that case. Bumps the seed's `access_count` and writes one row to `events.access_log` per invocation — the memory-side write that the read-only `graph query` surface cannot fire.
 
 ## When to use
 
@@ -17,8 +17,10 @@ Walks the relationship graph outward from one seed item and returns every node a
 ## How
 
 ```
-anton memory explore --seed-id <id> [--depth N] [--rel-types T1,T2] [--direction {out,in,both}] [--include-content]
+anton memory explore --seed-id <id> [--depth N] [--rel-types T1,T2] [--direction {out,in,both}] [--include-content] [--include-suppressed]
 ```
+
+The default walk hides edges an operator suppressed with `unrelate`; `--include-suppressed` shows them, each marked `suppressed: true`.
 
 ## Output
 

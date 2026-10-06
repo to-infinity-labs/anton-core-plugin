@@ -1,6 +1,6 @@
 ---
 name: expand
-description: Your tool for pulling the full body of memory ids that recall returned. Use for reading an id in full before quoting or editing it, and gestures like 'tell me more about X' or 'show full content'. Pairs with `explore` to widen to neighbors.
+description: Pulls the full body of memory ids that recall returned. Use for reading an id in full before quoting or editing it, and gestures like 'tell me more about X' or 'show full content'. Pairs with `explore` to widen to neighbors.
 allowed-tools: Bash
 ---
 
@@ -20,7 +20,7 @@ Fetches full content for one or more memory items by id. Multi-id calls also ups
 anton item get --ids <id1>,<id2>[,...] [--session-id <sid>] [--include-relationships] [--no-bump]
 ```
 
-The skill's user-facing surface is `expand`; the underlying cobra verb is `get`. An operator typing the verb directly should use `get`. The skill itself routes through `get` transparently and applies the batch cap from `tools.expand_batch_cap`.
+The skill's user-facing surface is `expand`; the underlying CLI verb is `get`. An operator typing the verb directly should use `get`. The verb keeps only the first `tools.expand_batch_cap` ids (default 10) and drops the rest without listing them in `missing_ids`, so split a longer list across calls.
 
 ## Output
 

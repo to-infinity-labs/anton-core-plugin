@@ -40,5 +40,5 @@ Default port is 7777. Honour an explicit operator port ("on port 8080") everywhe
 ## Output
 
 - One line — `Dashboard: http://127.0.0.1:$PORT/<path>` — plus whether the server was started fresh or an existing one was reused.
-- Lifecycle: the server lives until this session ends (background-task teardown, plus the session-end hook reap on port 7777) or until the stop gesture. Custom-port instances rely on session teardown alone.
+- Lifecycle: the server lives until this session ends or is cleared with /clear (background-task teardown, plus the session-end hook's reap of this session's dashboards), until an update to a different version, or until the stop gesture. A reused orphan from a crashed session is reaped at the next SessionEnd of any session.
 - The skill itself records nothing. The dashboard shows data without editing it; its one write is opening a node on the graph page, which raises that item's access count and logs the access, like a recall hit.

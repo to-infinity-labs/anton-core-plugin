@@ -5,6 +5,39 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-08
+
+### Changed
+
+- Ending a Claude Code session stops the dashboards that session started, on
+  whatever port, and any dashboard whose Claude Code session has gone. A
+  dashboard you started outside Claude Code, or another live session's, is
+  left running. `anton update` also stops dashboards left by an older version.
+- Saving a batch of notes is all or nothing: if one note cannot be written,
+  none are. Each note needs a `type`, `title` and `content`, a misspelt field
+  is refused with the note it came from, and the same note twice in one batch
+  is saved once.
+- `anton graph coverage` counts symbols without modules, and adds module and
+  doc counts. The dashboard's `/repos` and `/graph` pages show the same
+  Symbols, Modules, Docs and Edges for each repo.
+- The code-graph health check no longer warns about calls it could never
+  resolve. It counts only real misses in your registered repos; calls into
+  libraries and language builtins are counted as external instead, and
+  `anton graph coverage`, `/graph` and `/health` show the same counts.
+- Indexing skips vendored, minified and `repos.json` `ignore`d files, and flags
+  generated ones. A file the parser cannot finish within
+  `code_graph.parse_timeout_ms` (10 s) is quarantined and listed with its
+  reason rather than indexed half-read.
+- Call resolution is more accurate in C#, Java, JavaScript/TypeScript, PHP,
+  Python, Ruby and Rust; Python and Rust class members are methods. Each code
+  graph rebuilds from source once after updating.
+
+### Added
+
+- A batch save can link its notes: give a note a `key`, and `relations`
+  pointing at another note in the batch (`@<key>`) or an existing one by id.
+- `anton repos status` adds module and edge counts.
+
 ## [3.0.0] - 2026-10-06
 
 ### Breaking
@@ -530,7 +563,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.11.0...v3.0.0
 [2.11.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.9.0...v2.10.0

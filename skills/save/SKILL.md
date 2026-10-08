@@ -17,10 +17,20 @@ Single entry point for content entering the knowledge base. Auto-categorises pas
 ## How
 
 ```
-anton item save [--source-path <file> | --items-json <array> | --items-file <file> | --type T --title T --content C [--summary S] [--importance F]] [--tag <name> ...]
+anton item save [--source-path <file> | --items-json <array> | --items-file <file> | --type T --title T --content C [--summary S] [--importance F] [--relate <type>:<target-id> ...]] [--tag <name> ...]
 ```
 
 Three modes share one verb. `--source-path` runs the full intake pipeline against a file on disk. `--items-json` (or `--items-file`) writes a pre-parsed batch straight through reconcile and write. `--type` + `--title` + `--content` is the single-item shorthand for narrative the operator already has typed up; it also accepts `--summary` and `--importance` (`[0.0, 1.0]`, default `1`). `--tag` (repeatable; one tag per occurrence) applies in every mode: each tag is merged into each item's tags and deduplicated. Give `--type` a canonical type — `document`, `reference`, `project`, `feedback`, `note`, `fact`, `decision`, or `question`; an unrecognized value is coerced to `note` (a known synonym folds to its target) and the original is preserved on a `raw_type:` tag, so a save never fails on an unexpected type.
+
+## Batch shape
+
+```json
+[{"key": "ctx", "type": "note", "title": "Context", "content": "..."},
+ {"type": "decision", "title": "Use X", "content": "...", "tags": ["arch"],
+  "relations": [{"type": "supersedes", "target": "dec-1a2b3c4d"}, {"type": "relates_to", "target": "@ctx"}]}]
+```
+
+Every item needs `type`, `title` and `content`; `summary`, `tags`, `key` and `relations` are optional, and any other field rejects the batch. A relation's `type` is one of the `relate` verbs and its `target` is an existing id or `@<key>` naming another item in the batch. The whole batch is validated first and written in one transaction, so one bad item or missing target writes nothing. An item whose content already exists writes no row and no edges; a warning gives the `item relate` commands to assert them.
 
 ## Relate on save
 
@@ -28,7 +38,7 @@ Mode 3 also accepts `--relate <type>:<target-id>` (comma-separated or repeated) 
 
 ## Output
 
-Success envelope reports `status`, `written` (id list), `extracted`, `noop`, `rejected`, `type` (primary item type), `source_path`, `degraded_no_vector` (items a configured embedder left partly or wholly vectorless), `errors`, `warnings`, and `meta_used`, plus `saved_path` on a Mode 1 source copy and `relations_written` when `--relate` was supplied (the count of edges written with the item — the full set on a fresh item, `0` when the item deduped onto an existing row so no source landed for the edges to attach to). `item save` returns `{"status":"ok","source_path":"...","type":"...","extracted":[...],"written":[...],"noop":<false|[...]>,"rejected":N,"degraded_no_vector":N,"errors":[...],"warnings":[...],"meta_used":<true|false>}`. Contract: `item-save` in the anton-core CLI contract.
+Success envelope reports `status`, `written` (id list), `extracted`, `noop`, `rejected`, `type` (primary item type), `source_path`, `degraded_no_vector` (items a configured embedder left partly or wholly vectorless), `errors`, `warnings`, and `meta_used`, plus `saved_path` on a Mode 1 source copy, `relations_written` in Modes 2 and 3 (the count of manual edges written, `0` when none landed), and `keys` when a batch item carried one (each key's resolved id). `noop` is always an array: the id holding each item that wrote no row. `item save` returns `{"status":"ok","source_path":"...","type":"...","extracted":[...],"written":[...],"noop":[...],"rejected":N,"degraded_no_vector":N,"errors":[...],"warnings":[...],"meta_used":<true|false>}`. Contract: `item-save` in the anton-core CLI contract.
 
 ## Curation
 

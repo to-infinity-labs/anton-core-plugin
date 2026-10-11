@@ -1,6 +1,6 @@
 ---
 name: save
-description: Saves a durable fact, decision or correction to the knowledge base, in place of Claude Code's native auto memory. Use for capturing anything worth keeping across sessions, and gestures like 'save this' or 'remember this'.
+description: Saves a durable fact, decision or correction to the knowledge base, in place of the harness's native auto memory. Use for capturing anything worth keeping across sessions, and gestures like 'save this' or 'remember this'.
 allowed-tools: Bash
 ---
 
@@ -11,7 +11,7 @@ Single entry point for content entering the knowledge base. Auto-categorises pas
 ## When to use
 
 - "save this", "remember this", "store this", "add to kb"
-- `/anton-core:save` or any user gesture handing over content to preserve
+- `save` or any user gesture handing over content to preserve
 - After extracting facts or decisions worth persisting
 
 ## How

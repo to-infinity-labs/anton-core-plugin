@@ -11,7 +11,7 @@ Asserts — or suppresses — one operator relationship edge between two existin
 ## When to use
 
 - "link these two", "this supersedes that", "this resolves that error", "this is part of that project"
-- `/anton-core:relate` on two ids you already have — the same skill runs both the relate and unrelate verbs
+- `relate` on two ids you already have — the same skill runs both the relate and unrelate verbs
 - Curation: after saving a correction you want to keep both sides of, `relate` the new note over the old one with `supersedes`
 - Overruling the graph: `unrelate` a wrong pipeline-inferred edge — the "no" sticks against re-inference
 

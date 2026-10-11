@@ -7,14 +7,14 @@ disable-model-invocation: true
 
 ## What it does
 
-Foreground entry point to the same handlers the `session-end` hook backgrounds. Holds the maintenance lock at `${CLAUDE_PLUGIN_DATA}/data/.maintenance.lock` so foreground and background paths cannot race. Every verb delegates to an existing handler — the skill adds no new behavior, only a uniform invocation surface and a single standard result envelope per call.
+Foreground entry point to the same handlers the `session-end` hook backgrounds. Holds the maintenance lock at `~/.anton-core/data/.maintenance.lock` so foreground and background paths cannot race. Every verb delegates to an existing handler — the skill adds no new behavior, only a uniform invocation surface and a single standard result envelope per call.
 
 ## When to use
 
 - "run maintenance", "retry failed extractions", "dedupe tasks"
 - "purge stale items", "prune orphans", "reap orphaned graph stores", "reset access log", "re-judge refused pairs"
 - "calibrate the judge thresholds", "rewind the link cursor", "consolidate now"
-- "check maintenance status", `/anton-core:maintenance`
+- "check maintenance status", `maintenance`
 
 ## How
 

@@ -11,7 +11,8 @@
 # DELIBERATELY MINIMAL on the terminal path. It sources nothing (in particular
 # NOT scripts/lib/wrapper.sh), exports no environment, and performs no
 # bootstrap/cosign. The bare binary self-resolves its data root with no env
-# (CORE_DATA_DIR -> CORE_DEV_MODE-gated ./data -> ~/.anton-core/config.json),
+# (CORE_DATA_DIR -> CORE_DEV_MODE-gated ./data -> ~/.anton-core/config.json
+# -> ~/.anton-core),
 # and binary bootstrap + supply-chain verification are the hooks' job.
 # Duplicating the wrapper here would re-couple the operator entry point to a
 # rotating cache.
@@ -79,7 +80,7 @@ _find_plugin_launcher() {
         [[ "$_resolved" == "$_script_path" ]] && continue
         _cdir="$(cd "$(dirname "$_resolved")/.." 2>/dev/null && pwd)" || continue
         [[ -x "$_cdir/scripts/core" ]] || continue
-        grep -Eq '"name"[[:space:]]*:[[:space:]]*"anton-core"' "$_cdir/.claude-plugin/plugin.json" 2>/dev/null || continue
+        grep -Eqs '"name"[[:space:]]*:[[:space:]]*"anton-core"' "$_cdir/.claude-plugin/plugin.json" "$_cdir/.codex-plugin/plugin.json" || continue
         _plugin_launcher="$_cand"
         return 0
     done
@@ -151,13 +152,12 @@ if [[ ! -x "$_current" ]]; then
     exit 2
 fi
 
-# --- config-absent hint (non-fatal) ----------------------------------------
-# The bare binary resolves its data root with no env (CORE_DATA_DIR ->
-# dev-mode ./data -> ~/.anton-core/config.json) and emits a precondition
-# envelope when none is present. Surface a friendlier one-liner first, then
-# still exec so the operator also gets the binary's authoritative envelope.
-if [[ -z "${CORE_DATA_DIR:-}" ]] && [[ ! -d "./data" ]] && [[ ! -f "${HOME:-}/.anton-core/config.json" ]]; then
-    printf 'anton-core: no data root configured (~/.anton-core/config.json absent) — run /anton-core:setup.\n' >&2
+# --- fresh-root hint (non-fatal) -------------------------------------------
+# With no override the binary defaults to ~/.anton-core; before setup has
+# created its data/ there, surface a one-liner, then still exec.
+if [[ -z "${CORE_DATA_DIR:-}" ]] && [[ ! -d "./data" ]] && [[ ! -f "${HOME:-}/.anton-core/config.json" ]] && [[ ! -d "${HOME:-}/.anton-core/data" ]]; then
+    # shellcheck disable=SC2016  # $anton-core:setup is Codex's skill syntax, not an expansion
+    printf 'anton-core: no data root yet (~/.anton-core/data absent) — run the setup skill (/anton-core:setup, or $anton-core:setup in Codex).\n' >&2
 fi
 
 # argv[0]=core keeps cobra usage strings tidy. This exec runs only from a

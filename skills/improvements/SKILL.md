@@ -11,7 +11,7 @@ Operator-facing review queue for improvement suggestions emitted by the deep-ana
 ## When to use
 
 - "review improvements", "pending improvements", "apply improvement"
-- "what did deep analysis find", `/anton-core:improvements`
+- "what did deep analysis find", `improvements`
 - After session-end surfaces a fresh batch of suggestions for review
 
 ## How

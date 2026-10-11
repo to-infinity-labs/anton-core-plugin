@@ -10,33 +10,25 @@ source "$(dirname "$0")/lib/wrapper.sh"
 # when there is no pin (the staged-slot self-heal), this single call covers
 # BOTH "pinned binary rotates a staged slot" and "staged binary rotates
 # itself + writes the first pin".
-LOG_DIR="${CLAUDE_PLUGIN_DATA:-/tmp}/data/logs"
+LOG_DIR="${CORE_DATA_DIR:-/tmp}/data/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 "$ANTON_BIN" update apply-if-staged --quiet --budget 10s 1>/dev/null 2>>"$LOG_DIR/update.err" || true
 
 # Re-resolve the pin: the rotate above may have just written installed-version
 # (the staged-arm self-heal), so the ANTON_BIN the wrapper resolved (possibly
-# the staged slot) is now stale. Recompute it from the pin file so the exec
-# below runs the now-current binary. Guard the slot-missing case with the same
-# pin_drift envelope shape the wrapper emits.
-PIN_FILE="${CLAUDE_PLUGIN_DATA}/data/state/installed-version"
-if [[ -f "$PIN_FILE" ]]; then
-    _pin_ver="$(<"$PIN_FILE")"
-    _pin_ver="${_pin_ver#v}"
-    _pin_ver="${_pin_ver//$'\n'/}"
-    ANTON_BIN="${CLAUDE_PLUGIN_DATA}/data/versions/v${_pin_ver}/anton-core"
-    if [[ ! -x "$ANTON_BIN" ]]; then
-        printf '⚠ pin names a missing binary slot v%s; restore it with: anton bootstrap --version v%s\n' "$_pin_ver" "$_pin_ver" >&2
-        printf '{"status":"error","error":{"kind":"internal","reason":"pin_drift_fatal","pinned_version":"v%s"}}\n' "$_pin_ver" >&2
-        exit 2
-    fi
-    export ANTON_BIN
+# the staged slot) is now stale.
+_pin_rc=0
+_resolve_pinned_bin "$CORE_DATA_DIR" || _pin_rc=$?
+if [[ $_pin_rc -ne 0 ]]; then
+    [[ -n "$_anton_harness_flag" && "$ANTON_HARNESS" == codex ]] && exit 0
+    exit 2
 fi
+export ANTON_BIN
 
-# Seed ~/.anton-core/config.json with the resolved data root at the earliest
-# authoritative moment (hooks get CLAUDE_PLUGIN_DATA → wrapper.sh set
-# CORE_DATA_DIR). This makes the shim's config.json fallback (Bug 2 A1) work on
-# first run, before setup Step 3b would otherwise write it. Best-effort.
-"$ANTON_BIN" setup persist-data-dir >/dev/null 2>>"$LOG_DIR/update.err" || true
+# Move a store outside ~/.anton-core into it, detached so the hook never waits
+# on it; this session keeps the old root, now a compat symlink.
+# spawn-detached's own envelope stays off the hook's stdout.
+# shellcheck disable=SC2094  # --log is the detached child's append target; nothing here reads it
+"$ANTON_BIN" hook spawn-detached --log "$LOG_DIR/update.err" -- "$ANTON_BIN" setup relocate-data-root >/dev/null 2>>"$LOG_DIR/update.err" || true
 
 hook_exec_fail_open session-start "$@"

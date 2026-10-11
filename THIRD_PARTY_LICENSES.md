@@ -115,3 +115,24 @@ The bundle inlines these packages; their licence texts are in [`internal/dashboa
   - `internal/dashboard/assets/vendor/Pass.js@08c996de`
   - `internal/dashboard/assets/vendor/LuminosityHighPassShader.js@e69f66b4`
   - `internal/dashboard/assets/vendor/CopyShader.js@a33057d5`
+
+## OpenAI Codex hook schemas
+
+- **Component:** OpenAI Codex hook command schemas (`codex-rs/hooks/schema/generated`), the six events anton handles; embedded only by tests
+- **License:** Apache-2.0
+- **Copyright:** © 2025 OpenAI
+- **Source:** <https://github.com/openai/codex>, tag `rust-v0.162.0`, commit `c1382380de69521303b416720a52f42d51af6248`
+- **License text:** [`internal/harness/codex/schema/generated/codex.LICENSE`](internal/harness/codex/schema/generated/codex.LICENSE)
+- **Vendored assets (sha-pinned):**
+  - `internal/harness/codex/schema/generated/post-tool-use.command.input.schema.json@8ea1e4bc`
+  - `internal/harness/codex/schema/generated/post-tool-use.command.output.schema.json@a823d0e2`
+  - `internal/harness/codex/schema/generated/pre-compact.command.input.schema.json@065f0ae3`
+  - `internal/harness/codex/schema/generated/pre-compact.command.output.schema.json@c392f305`
+  - `internal/harness/codex/schema/generated/pre-tool-use.command.input.schema.json@fabed428`
+  - `internal/harness/codex/schema/generated/pre-tool-use.command.output.schema.json@e684f81c`
+  - `internal/harness/codex/schema/generated/session-end.command.input.schema.json@23b1b69f`
+  - `internal/harness/codex/schema/generated/session-start.command.input.schema.json@54168cf0`
+  - `internal/harness/codex/schema/generated/session-start.command.output.schema.json@f375e6de`
+  - `internal/harness/codex/schema/generated/user-prompt-submit.command.input.schema.json@e6b923bc`
+  - `internal/harness/codex/schema/generated/user-prompt-submit.command.output.schema.json@5e290303`
+  - `internal/harness/codex/schema/generated/codex.NOTICE@9d71575e`

@@ -11,8 +11,8 @@ Read-only diagnostic surface. Composes per-subsystem panels (memory invariants, 
 ## When to use
 
 - "health", "is it working"
-- "system check", "diagnostics", `/anton-core:health`
-- Verification step after `/anton-core:setup` or before a long session
+- "system check", "diagnostics", `health`
+- Verification step after `setup` or before a long session
 
 ## How
 

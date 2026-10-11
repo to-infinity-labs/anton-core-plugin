@@ -19,12 +19,8 @@
 # release repo; no token / auth / URL-base / API-base env vars are consulted.
 # Assets are fetched by their stable releases/download/v<ver>/<asset> URLs.
 #
-# Root resolution: a caller-provided CLAUDE_PLUGIN_DATA is normalized (a
-# trailing /data segment is stripped, mirroring the Go resolver); when unset
-# and the plugin root is a Claude-Code cache path, the persistent root is
-# self-derived and — on a successful install — seeded into
-# ~/.anton-core/config.json (only when absent), so the rest of setup needs no
-# environment at all.
+# Root resolution is wrapper.sh's _resolve_data_root, the chain the binary
+# itself walks, so the slot lands where every later call reads it.
 #
 # Honors:
 #   ANTON_SKIP_BOOTSTRAP — non-empty disables the fetch entirely (hermetic
@@ -34,59 +30,12 @@
 # (with a machine-parseable reason on stderr).
 set -euo pipefail
 
-# ── Resolve self + plugin roots ───────────────────────────────────────────
-# Standalone: derive CLAUDE_PLUGIN_ROOT from the script's own location when the
-# caller did not set it (setup / Claude Code do). Script lives at
-# scripts/lib/bootstrap-fetch.sh, so ../.. is the repo/plugin root.
+# ── Resolve the plugin and data roots ─────────────────────────────────────
+# Standalone, so the plugin root falls back to this script's own ../.. .
 _script_dir="$(cd "$(dirname "$0")" && pwd)"
-: "${CLAUDE_PLUGIN_ROOT:=$(cd "$_script_dir/../.." && pwd)}"
-
-# CLAUDE_PLUGIN_DATA is the persistent state root. Resolution, in order:
-#   1. Caller-provided env, NORMALIZED: a trailing `data` segment is stripped —
-#      the exact mirror of the Go resolver's root-normalization logic, which the
-#      Go binary applies to CORE_DATA_DIR. Without this, a hand-assembled
-#      `<root>/data` value stages into `<root>/data/data/{versions,state}`
-#      while the binary reads `<root>/data/...` — the nested-tree failure that
-#      bricked the v2.1.0 field install.
-#   2. Self-derived from the plugin's own cache location: skills run in the
-#      Bash tool, where CLAUDE_PLUGIN_DATA is NOT in the environment (it is
-#      hook-only env), so when it is unset and CLAUDE_PLUGIN_ROOT matches the
-#      Claude-Code-managed shape */plugins/cache/<marketplace>/<plugin>/<ver>,
-#      the persistent root is <plugins-dir>/data/<marketplace>-<plugin> (the
-#      Claude Code plugin-data convention). The marketplace-clone shape
-#      (*/plugins/marketplaces/*) is deliberately NOT derived — it has no
-#      version segment and setup never sees it; it falls through to the
-#      managed-cache refusal below.
-#   3. Repo/plugin-root fallback for repo-local dev runs, matching
-#      scripts/lib/wrapper.sh's default.
-_derived_root="false"
-if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
-    if [[ "$(basename "$CLAUDE_PLUGIN_DATA")" == "data" ]]; then
-        CLAUDE_PLUGIN_DATA="$(dirname "$CLAUDE_PLUGIN_DATA")"
-    fi
-else
-    case "$CLAUDE_PLUGIN_ROOT" in
-        */plugins/cache/*/*/*)
-            _plugins_dir="${CLAUDE_PLUGIN_ROOT%/cache/*}"
-            _cache_rel="${CLAUDE_PLUGIN_ROOT#*/plugins/cache/}"
-            _mkt="${_cache_rel%%/*}"
-            _rest="${_cache_rel#*/}"
-            _plugin="${_rest%%/*}"
-            if [[ -n "$_mkt" && -n "$_plugin" ]]; then
-                CLAUDE_PLUGIN_DATA="${_plugins_dir}/data/${_mkt}-${_plugin}"
-                _derived_root="true"
-                printf 'bootstrap-fetch: derived persistent data root %s from the plugin cache location\n' \
-                    "$CLAUDE_PLUGIN_DATA"
-            else
-                CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_ROOT"
-            fi
-            ;;
-        *)
-            CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_ROOT"
-            ;;
-    esac
-fi
-export CLAUDE_PLUGIN_ROOT CLAUDE_PLUGIN_DATA
+_anton_self_root="$(cd "$_script_dir/../.." && pwd)"
+# shellcheck source=wrapper.sh disable=SC1091
+ANTON_RESOLVE_ONLY=1 source "$_script_dir/wrapper.sh"
 
 _repo_slug="to-infinity-labs/anton-core-plugin"
 
@@ -131,21 +80,17 @@ _fail() {
     exit 1
 }
 
+_resolve_data_root "${CORE_DATA_DIR:-}" || _fail "data_root_unresolved" "CORE_DATA_DIR and HOME are both unset"
+# shellcheck disable=SC2154  # set by wrapper.sh's _resolve_data_root
+_data_root="$_anton_root"
+
 # ── Manifest version reader (jq preferred, grep fallback) ─────────────────
+# Either harness's manifest carries the version; they are gated to agree.
 _read_manifest_version() {
-    local manifest="${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json"
-    if [[ ! -f "$manifest" ]]; then
-        echo ""
-        return 0
-    fi
-    if command -v jq >/dev/null 2>&1; then
-        jq -r '.version // empty' "$manifest" 2>/dev/null || true
-    else
-        grep -E '"version"[[:space:]]*:[[:space:]]*"[^"]+"' "$manifest" \
-            | head -1 \
-            | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
-            || true
-    fi
+    local v
+    v="$(_json_field version "${ANTON_PLUGIN_ROOT}/.claude-plugin/plugin.json")"
+    [[ -n "$v" ]] || v="$(_json_field version "${ANTON_PLUGIN_ROOT}/.codex-plugin/plugin.json")"
+    printf '%s' "$v"
 }
 
 # ── Skip hatch ────────────────────────────────────────────────────────────
@@ -185,7 +130,7 @@ else
 fi
 if [[ -z "$ver" ]]; then
     _fail "missing_manifest_version" \
-        "cannot determine target version (no --version arg and .claude-plugin/plugin.json missing or unreadable)"
+        "cannot determine target version (no --version arg, and neither .claude-plugin/plugin.json nor .codex-plugin/plugin.json is readable)"
 fi
 # Sanity-clamp the version before it lands in a URL and JSON. A trusted source
 # (manifest / operator arg) still gets validated so a malformed value can never
@@ -207,15 +152,15 @@ case "$arch" in
     *) _fail "unsupported_arch:$arch" "unsupported arch '$arch' (release pipeline ships amd64 + arm64 only)" ;;
 esac
 
-# ── Refuse to install into a Claude-Code-managed cache/marketplace clone ──
-# Those dirs are never pruned by Claude Code, so a binary installed there leaks
+# ── Refuse to install into a harness-managed cache/marketplace clone ──────
+# Those dirs are never pruned by the harness, so a binary installed there leaks
 # ~55 MB per version indefinitely. Match the literal install root (no realpath
 # — it may not exist yet).
-_versions_root="${CLAUDE_PLUGIN_DATA}/data/versions"
+_versions_root="${_data_root}/data/versions"
 case "$_versions_root" in
     */plugins/cache/*|*/plugins/marketplaces/*)
         _fail "install_dir_in_managed_cache" \
-            "refusing to install into the Claude Code plugin cache/marketplace clone ($_versions_root) — that location is wiped on plugin updates, and the persistent data root could not be determined from this plugin-root shape"
+            "refusing to install into a plugin cache/marketplace clone ($_versions_root) — that location is wiped on plugin updates; point CORE_DATA_DIR elsewhere or unset it for ~/.anton-core"
         ;;
 esac
 
@@ -225,7 +170,7 @@ command -v curl >/dev/null 2>&1 || _fail "curl_not_installed" \
 
 dest_dir="${_versions_root}/v${ver}"
 dest="${dest_dir}/anton-core"
-state_dir="${CLAUDE_PLUGIN_DATA}/data/state"
+state_dir="${_data_root}/data/state"
 
 # ── Bootstrap lock (mkdir mutex, BOUNDED wait) ────────────────────────────
 # Concurrent setup flows (or a setup racing a manual re-run) would otherwise
@@ -234,8 +179,8 @@ state_dir="${CLAUDE_PLUGIN_DATA}/data/state"
 # attempts ~1s apart, then give up — never an unbounded wait. Stale-lock
 # reclaim is PID-fenced: a waiter that finds a dead holder races to atomically
 # rename the lockdir aside; exactly one waiter wins the rename and cleans up.
-mkdir -p "${CLAUDE_PLUGIN_DATA}/data"
-_lock_target="${CLAUDE_PLUGIN_DATA}/data/.bootstrap-fetch.lock"
+mkdir -p "${_data_root}/data"
+_lock_target="${_data_root}/data/.bootstrap-fetch.lock"
 _lock_attempt=0
 while true; do
     # A concurrent fetch may have already installed the slot while we waited.
@@ -391,41 +336,6 @@ if ! mv "$staged_tmp" "${state_dir}/staged-update.json" 2>/dev/null; then
     rm -f "$staged_tmp" 2>/dev/null || true
     _fail "staged_write_failed" \
         "installed the binary but failed to write ${state_dir}/staged-update.json"
-fi
-
-# ── Seed the operator config (self-derived root only, only-if-absent) ─────
-# When the root was self-derived (no env), persist it to
-# ~/.anton-core/config.json so every later binary call — `update
-# apply-if-staged`, `db init`, all of Stage 1+ — resolves the same root via
-# the operator-config step (the Go path resolver's root-resolution step 3, and
-# scripts/core's non-authoritative read) with NO environment at all. An
-# existing config is operator-owned and never touched; `core setup
-# persist-data-dir` remains the owner for all later updates. Deliberately
-# NOT seeded for caller-provided or dev-fallback roots — a repo checkout
-# must never become the operator's persistent data root. Best-effort: a
-# seed failure warns (setup's persist-data-dir step still covers it).
-if [[ "$_derived_root" == "true" && -n "${HOME:-}" ]]; then
-    _op_cfg_dir="${HOME}/.anton-core"
-    _op_cfg="${_op_cfg_dir}/config.json"
-    if [[ ! -e "$_op_cfg" ]]; then
-        _cfg_tmp="${_op_cfg_dir}/.config.json.tmp.$$"
-        _seed_ok="false"
-        if mkdir -p "$_op_cfg_dir" 2>/dev/null; then
-            if command -v jq >/dev/null 2>&1; then
-                jq -n --arg root "$CLAUDE_PLUGIN_DATA" '{data_root: $root}' > "$_cfg_tmp" 2>/dev/null && _seed_ok="true"
-            else
-                printf '{\n  "data_root": "%s"\n}\n' "$CLAUDE_PLUGIN_DATA" > "$_cfg_tmp" 2>/dev/null && _seed_ok="true"
-            fi
-        fi
-        if [[ "$_seed_ok" == "true" ]] \
-            && chmod 600 "$_cfg_tmp" 2>/dev/null \
-            && mv "$_cfg_tmp" "$_op_cfg" 2>/dev/null; then
-            printf 'bootstrap-fetch: seeded %s with data_root=%s\n' "$_op_cfg" "$CLAUDE_PLUGIN_DATA"
-        else
-            rm -f "$_cfg_tmp" 2>/dev/null || true
-            printf 'bootstrap-fetch: warning: could not seed %s; setup will persist the data root later\n' "$_op_cfg" >&2
-        fi
-    fi
 fi
 
 printf 'bootstrap-fetch: installed anton-core v%s (%s/%s) cosign_verified=%s\n' \

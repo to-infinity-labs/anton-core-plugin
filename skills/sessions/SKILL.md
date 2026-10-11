@@ -1,6 +1,6 @@
 ---
 name: sessions
-description: Browses past Claude Code session stats, history, and applied improvements. Use for "session stats", "how did my sessions go", or "what skills did I use". Pairs with `improvements` (action queue).
+description: Browses past harness session stats, history, and applied improvements. Use for "session stats", "how did my sessions go", or "what skills did I use". Pairs with `improvements` (action queue).
 allowed-tools: Bash
 ---
 
@@ -11,7 +11,7 @@ Read-only browser over the session-intelligence sidecar populated by the `Sessio
 ## When to use
 
 - "session stats", "how did my sessions go", "session history"
-- "what skills did I use", `/anton-core:sessions`
+- "what skills did I use", `sessions`
 - Auditing recent session activity, flag counts, or tool-usage histograms
 
 ## How
@@ -28,7 +28,7 @@ anton improvement list --applied-only [--limit N]
 
 ## Output
 
-Per-verb envelopes: `session list` returns `{"status":"ok","count":N,"sessions":[{"session_id":"...","headline":"...","started_at":<epoch-ms>,"duration_minutes":N,...}]}`, where each row carries `has_flags:1` only when the session raised flags — the field is omitted when it would be `0`; `session stats` returns `{"status":"ok","period_days":N,"sessions":N,"avg_duration_minutes":N,"avg_messages":N,"flagged_sessions":N,"top_tools":{...},"improvements":N,"token_total":N}` — `token_total` sums each session's main-transcript token buckets (input + output + cache read + cache creation; subagent spend lives in the token-usage ledger, surfaced by [usage](../usage/SKILL.md)); `session get` returns `{"status":"ok","session":{"session_id":"...","started_at":<epoch-ms>,...}}`; `session mark-reflected` stamps `reflected_at` on the matching row and returns `{"status":"ok","session":{"id":"...","reflected_at":<epoch-ms>}}`; `improvement list --applied-only` returns `{"status":"ok","improvements":[...],"count":N}`. Contract: `session-list` in the anton-core CLI contract.
+Per-verb envelopes: `session list` returns `{"status":"ok","count":N,"sessions":[{"harness":"claude","session_id":"...","headline":"...","started_at":<epoch-ms>,"duration_minutes":N,...}]}`, where each row carries `has_flags:1` only when the session raised flags — the field is omitted when it would be `0`; `session stats` returns `{"status":"ok","harness":"all","period_days":N,"sessions":N,"avg_duration_minutes":N,"avg_messages":N,"flagged_sessions":N,"top_tools":{...},"improvements":N,"token_total":N}` — `token_total` sums each session's main-transcript token buckets (input + output + cache read + cache creation; subagent spend lives in the token-usage ledger, surfaced by [usage](../usage/SKILL.md)); `session get` returns `{"status":"ok","session":{"harness":"claude","session_id":"...","started_at":<epoch-ms>,...}}`; `session mark-reflected` stamps `reflected_at` on the matching row and returns `{"status":"ok","session":{"id":"...","reflected_at":<epoch-ms>}}`; `improvement list --applied-only` returns `{"status":"ok","improvements":[...],"count":N}`. `--harness claude|codex` narrows list, get and stats to one harness (default `all`). Contract: `session-list` in the anton-core CLI contract.
 
 ## See also
 

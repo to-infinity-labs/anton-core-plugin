@@ -4,190 +4,218 @@
 # so `dirname $0` resolves to scripts/ and `..` to repo root.
 set -euo pipefail
 
-# Capture whether CLAUDE_PLUGIN_DATA was authoritatively provided by Claude
-# Code (hooks/skills) vs. about-to-be-defaulted to CLAUDE_PLUGIN_ROOT below.
-# Only an authoritative value drives CORE_DATA_DIR (the data root). Use an
-# explicit yes/no sentinel + a presence test (${VAR+x}), NOT := — the colon
-# form re-fires on a set-but-EMPTY value, so an exported empty from scripts/core
-# would get re-defaulted to "yes" here (CLAUDE_PLUGIN_DATA is set by now),
-# re-pinning the cache. scripts/core writes a non-empty "no" for operator-shell;
-# the presence test below leaves any already-set value (incl. "no") untouched.
-if [ -z "${ANTON_DATA_DIR_AUTHORITATIVE+x}" ]; then
-    if [ -n "${CLAUDE_PLUGIN_DATA+x}" ]; then
-        ANTON_DATA_DIR_AUTHORITATIVE=yes
-    else
-        ANTON_DATA_DIR_AUTHORITATIVE=no
-    fi
-fi
-export ANTON_DATA_DIR_AUTHORITATIVE
-
-# CLAUDE_PLUGIN_ROOT is set by Claude Code at hook fire time; fall back to the
-# caller wrapper's parent-of-parent so the same script runs under
-# `bash scripts/x.sh` during local testing.
-: "${CLAUDE_PLUGIN_ROOT:=$(cd "$(dirname "$0")/.." && pwd)}"
-export CLAUDE_PLUGIN_ROOT
-
-# CLAUDE_PLUGIN_DATA is the persistent state root
-# (the three-location split). The binary
-# cache lives here so it survives plugin updates that wipe CLAUDE_PLUGIN_ROOT.
-# For repo-local dev runs without DATA set, fall back to PLUGIN_ROOT so the
-# Makefile's `make build` output at bin/ remains the source of truth.
-: "${CLAUDE_PLUGIN_DATA:=$CLAUDE_PLUGIN_ROOT}"
-export CLAUDE_PLUGIN_DATA
-
-# Translate to the $CORE_DATA_DIR the Go path resolver reads — but ONLY
-# when CLAUDE_PLUGIN_DATA is authoritative. In operator-shell mode it was just
-# defaulted to the cache above; pinning CORE_DATA_DIR there is exactly the bug
-# that stranded data in the rotating cache. Leaving it unset lets the resolver
-# reach the ~/.anton-core/config.json step. := respects a pre-set override.
-if [[ "${ANTON_DATA_DIR_AUTHORITATIVE:-}" == "yes" ]]; then
-    : "${CORE_DATA_DIR:=$CLAUDE_PLUGIN_DATA}"
-    export CORE_DATA_DIR
-fi
-
-# ── Binary resolution (hooks answer or enqueue) ────────────────
-# Hooks never fetch or manage the binary. Resolution is a fixed precedence:
-#   (1) the pin written by a successful `update apply-if-staged`;
-#   (2) a repo-local dev build (`make build` → bin/anton-core);
-#   (3) a staged-but-not-yet-rotated slot (self-heal — SessionStart rotates
-#       it in on the next fire; a present staged slot is NOT "missing").
-# If none resolve, emit a structured precondition envelope and exit 0 (hooks
-# are non-blocking) — install/repair is /anton-core:setup's job, never a
-# hook's. The fetch/skew/bootstrap machinery that used to live here moved to
-# setup + the detached stage step per the update-lifecycle re-home.
-
-# Read the binary_path field out of a staged-update.json record (the prefetch
-# artefact, the Go staged-update record). jq preferred; grep is a defensive
-# fallback so the wrapper still self-heals on a host without jq. Prints the
-# path, or empty on any miss.
-_read_staged_binary_path() {
-    local state_file="$1"
-    if [[ ! -f "$state_file" ]]; then
-        echo ""
-        return 0
-    fi
+# _json_field <key> <file> — the string value of <key> in a JSON file, empty on
+# any miss. jq preferred; the grep fallback keeps a jq-less host working.
+_json_field() {
+    [[ -f "$2" ]] || return 0
     if command -v jq >/dev/null 2>&1; then
-        jq -r '.binary_path // empty' "$state_file" 2>/dev/null || true
+        jq -r --arg k "$1" '.[$k] // empty' "$2" 2>/dev/null || true
     else
-        grep -E '"binary_path"[[:space:]]*:[[:space:]]*"[^"]+"' "$state_file" \
+        grep -E "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" "$2" 2>/dev/null \
             | head -1 \
-            | sed -E 's/.*"binary_path"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+            | sed -E "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"([^\"]+)\".*/\1/" \
             || true
     fi
 }
 
-# (1) Pin resolution. Source of truth is
-# ${CLAUDE_PLUGIN_DATA}/data/state/installed-version (a single `vX.Y.Z\n` line
-# written by `update apply-if-staged` after its health gate). The pin
-# decouples the running binary from Claude Code's /plugin update cadence: a
-# `git pull` that bumps plugin.json never changes which binary the wrapper
-# exec's — hooks answer or enqueue, they never fetch.
-PIN_FILE="${CLAUDE_PLUGIN_DATA}/data/state/installed-version"
+# _normalize_root <root> — the Go resolver's NormalizeRoot: a trailing /data
+# segment is stripped, else the store would nest data/data.
+_normalize_root() {
+    local r="$1"
+    while [[ "$r" == */ && "$r" != / ]]; do r="${r%/}"; done
+    [[ "${r##*/}" == data ]] && r="${r%data}" && r="${r%/}"
+    printf '%s' "${r:-/}"
+}
+
+# _resolve_data_root [override] — the binary's data-root chain, so the shell and
+# Go always agree: the override or CORE_DATA_DIR, the CORE_DEV_MODE-gated
+# ./data probe, ~/.anton-core/config.json's data_root, a previous release's
+# Claude Code store while ~/.anton-core holds none (a real directory, not the
+# compat symlink a move leaves), then ~/.anton-core. Sets _anton_root and
+# _anton_root_src (env|dev_mode|operator_config|legacy|default); returns 1 when
+# CORE_DATA_DIR and HOME are both unset. No harness's plugin-data variable
+# takes part.
+_resolve_data_root() {
+    local v="${1:-${CORE_DATA_DIR:-}}"
+    _anton_root=""
+    _anton_root_src=""
+    if [[ -n "$v" ]]; then
+        _anton_root="$(_normalize_root "$v")"
+        _anton_root_src="env"
+        return 0
+    fi
+    if [[ -n "${CORE_DEV_MODE:-}" && -d "$PWD/data" ]]; then
+        _anton_root="$(_normalize_root "$PWD")"
+        _anton_root_src=dev_mode
+        return 0
+    fi
+    [[ -n "${HOME:-}" ]] || return 1
+    v="$(_json_field data_root "$HOME/.anton-core/config.json")"
+    if [[ -n "$v" ]]; then
+        _anton_root="$(_normalize_root "$v")"
+        _anton_root_src=operator_config
+        return 0
+    fi
+    if [[ ! -e "$HOME/.anton-core/data/core.db" ]]; then
+        v="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/data/anton-core-anton-core"
+        if [[ -d "$v" && ! -L "$v" && -f "$v/data/core.db" ]]; then
+            _anton_root="$v"
+            _anton_root_src=legacy
+            return 0
+        fi
+    fi
+    _anton_root="$HOME/.anton-core"
+    _anton_root_src=default
+}
+
+# _resolve_pinned_bin <root> — sets ANTON_BIN by a fixed precedence: (1) the pin
+# `update apply-if-staged` writes at data/state/installed-version, (2) a
+# repo-local dev build (`make build` → bin/anton-core), (3) a staged slot not
+# yet rotated in, so SessionStart has a binary to rotate it with. Hooks never
+# fetch: installing is the setup skill's job. A pin naming a missing slot
+# returns 2 with ANTON_BIN left on that slot — resolving any other version is
+# exactly the drift the pin exists to prevent. A dev-mode root is the cwd,
+# which a hook can fire in any checkout of, so only the plugin's own dev build
+# is ever executed for it — never a pin or staged slot found under ./data.
+_resolve_pinned_bin() {
+    local root="$1" ver staged
+    ANTON_BIN=""
+    if [[ "${_anton_root_src:-}" == dev_mode ]]; then
+        [[ -x "$ANTON_PLUGIN_ROOT/bin/anton-core" ]] && ANTON_BIN="$ANTON_PLUGIN_ROOT/bin/anton-core"
+        return 0
+    fi
+    if [[ -f "$root/data/state/installed-version" ]]; then
+        ver="$(<"$root/data/state/installed-version")"
+        ver="${ver#v}"
+        ver="${ver//$'\n'/}"
+        ANTON_BIN="$root/data/versions/v${ver}/anton-core"
+        [[ -x "$ANTON_BIN" ]] && return 0
+        # The remedy must not pass this gate: the anton launcher runs
+        # `bootstrap` before scripts/core sources this file.
+        printf '⚠ pin names a missing binary slot v%s; restore it with: anton bootstrap --version v%s\n' "$ver" "$ver" >&2
+        printf '{"status":"error","error":{"kind":"internal","reason":"pin_drift_fatal","pinned_version":"v%s"}}\n' "$ver" >&2
+        return 2
+    fi
+    if [[ -x "$ANTON_PLUGIN_ROOT/bin/anton-core" ]]; then
+        ANTON_BIN="$ANTON_PLUGIN_ROOT/bin/anton-core"
+        return 0
+    fi
+    # binary_path is written relative to the data dir; tolerate an absolute one.
+    staged="$(_json_field binary_path "$root/data/state/staged-update.json")"
+    case "$staged" in
+        "") ;;
+        /*) [[ -x "$staged" ]] && ANTON_BIN="$staged" ;;
+        *) [[ -x "$root/$staged" ]] && ANTON_BIN="$root/$staged" ;;
+    esac
+    return 0
+}
+
+# ANTON_HARNESS: the hook runner's --harness, else the harness whose session
+# variables are set. _anton_harness_flag records that the runner named it, the
+# one case where a precondition must stay off stdout.
+ANTON_HARNESS=""
+_anton_harness_flag=""
+_prev=""
+for _arg in "$@"; do
+    case "$_arg" in
+        --harness=*) ANTON_HARNESS="${_arg#--harness=}" _anton_harness_flag=1 ;;
+        *) [[ "$_prev" == "--harness" ]] && ANTON_HARNESS="$_arg" _anton_harness_flag=1 ;;
+    esac
+    _prev="$_arg"
+done
+unset _prev _arg
+if [[ -z "$ANTON_HARNESS" ]]; then
+    if [[ -n "${CODEX_SESSION_ID:-}${CODEX_THREAD_ID:-}" ]]; then
+        ANTON_HARNESS=codex
+    elif [[ -n "${CLAUDE_PLUGIN_DATA:-}${CLAUDE_CODE_SESSION_ID:-}" ]]; then
+        ANTON_HARNESS=claude
+    fi
+fi
+export ANTON_HARNESS
+
+# The harness sets its own plugin-root variable at hook fire time; a sourcing
+# script may name its own root in _anton_self_root, else the caller sits in
+# scripts/ and the root is its parent. CLAUDE_PLUGIN_ROOT stays exported for a
+# pinned binary older than ANTON_PLUGIN_ROOT.
+ANTON_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-${_anton_self_root:-$(cd "$(dirname "$0")/.." && pwd)}}}"
+: "${CLAUDE_PLUGIN_ROOT:=$ANTON_PLUGIN_ROOT}"
+export ANTON_PLUGIN_ROOT CLAUDE_PLUGIN_ROOT
+
+if _resolve_data_root "${CORE_DATA_DIR:-}"; then
+    CORE_DATA_DIR="$_anton_root"
+    export CORE_DATA_DIR
+fi
+
+# ANTON_RESOLVE_ONLY: a sourcing script wants the exports, not a binary.
+if [[ -n "${ANTON_RESOLVE_ONLY:-}" ]]; then
+    return 0
+fi
+
 ANTON_BIN=""
-if [[ -f "$PIN_FILE" ]]; then
-    INSTALLED_VERSION="$(<"$PIN_FILE")"
-    INSTALLED_VERSION="${INSTALLED_VERSION#v}"
-    INSTALLED_VERSION="${INSTALLED_VERSION//$'\n'/}"
-    ANTON_BIN="${CLAUDE_PLUGIN_DATA}/data/versions/v${INSTALLED_VERSION}/anton-core"
-    if [[ ! -x "$ANTON_BIN" ]]; then
-        # Pin names a slot that doesn't exist. Refuse to start rather than
-        # silently resolve a different version — the pin exists precisely to
-        # prevent that drift. The remedy must not pass this gate: the anton
-        # launcher runs `bootstrap` before scripts/core sources this file.
-        printf '⚠ pin names a missing binary slot v%s; restore it with: anton bootstrap --version v%s\n' "$INSTALLED_VERSION" "$INSTALLED_VERSION" >&2
-        printf '{"status":"error","error":{"kind":"internal","reason":"pin_drift_fatal","pinned_version":"v%s"}}\n' "$INSTALLED_VERSION" >&2
+if [[ -n "$_anton_root" ]]; then
+    _pin_rc=0
+    _resolve_pinned_bin "$_anton_root" || _pin_rc=$?
+    if [[ $_pin_rc -ne 0 ]]; then
         # scripts/core captures this file's stderr; an exit here would end it
         # with the message still in the capture file.
-        if [[ -n "${ANTON_DEFER_BOOTSTRAP_ERROR:-}" ]]; then
-            return 2
-        fi
+        [[ -n "${ANTON_DEFER_BOOTSTRAP_ERROR:-}" ]] && return 2
+        # Codex reads a non-zero hook exit as a failed hook.
+        [[ -n "$_anton_harness_flag" && "$ANTON_HARNESS" == codex ]] && exit 0
         exit 2
     fi
 fi
 export ANTON_BIN
 
-# (2) Dev-build override. When running from a working tree with a freshly
-# built bin/anton-core (`make build`) and no valid pin resolved, prefer it so
-# contributors can test wrapper changes without staging a release binary.
-if [[ -x "${CLAUDE_PLUGIN_ROOT}/bin/anton-core" ]] && [[ ! -x "$ANTON_BIN" ]]; then
-    ANTON_BIN="${CLAUDE_PLUGIN_ROOT}/bin/anton-core"
-    export ANTON_BIN
-fi
-
-# (3) Staged-slot self-heal. No pin and no dev build, but a staged-update.json
-# record is present: resolve ANTON_BIN to the STAGED binary so SessionStart
-# can rotate it in (its `update apply-if-staged` writes the first pin). This
-# is the "staged-but-not-yet-rotated" case — a present staged slot must NOT
-# be treated as missing, or SessionStart never gets a binary to run its
-# rotate and the self-heal breaks.
-STAGED_STATE="${CLAUDE_PLUGIN_DATA}/data/state/staged-update.json"
-if [[ ! -x "$ANTON_BIN" ]] && [[ -f "$STAGED_STATE" ]]; then
-    _staged_bin="$(_read_staged_binary_path "$STAGED_STATE")"
-    if [[ -n "$_staged_bin" ]]; then
-        # binary_path is written relative to the data dir
-        # (data/versions/v<ver>/anton-core); tolerate an absolute path too.
-        case "$_staged_bin" in
-            /*) : ;;
-            *)  _staged_bin="${CLAUDE_PLUGIN_DATA}/${_staged_bin}" ;;
-        esac
-        if [[ -x "$_staged_bin" ]]; then
-            ANTON_BIN="$_staged_bin"
-            export ANTON_BIN
+# Nothing resolved. A hook prints the precondition envelope and exits 0 (hooks
+# are non-blocking). Under the runner's --harness codex the envelope goes to
+# stderr instead: Codex's strict parse fails any {-prefixed stdout that is not
+# a valid output. A Codex shell call, with no flag, is a command rather than a
+# hook, so it fails non-zero. ANTON_DEFER_BOOTSTRAP_ERROR lets a sourcing
+# script (scripts/core) emit its own skill-shape envelope instead.
+if [[ ! -x "$ANTON_BIN" && -z "${ANTON_DEFER_BOOTSTRAP_ERROR:-}" ]]; then
+    # shellcheck disable=SC2016  # $anton-core:setup is Codex's skill syntax, not an expansion
+    _missing='{"status":"error","error":{"kind":"precondition_missing","reason":"binary_missing_run_setup","detail":"anton-core binary not found; run the setup skill (/anton-core:setup, or $anton-core:setup in Codex) to install anton-core."}}'
+    if [[ "$ANTON_HARNESS" == codex ]]; then
+        if [[ -n "$_anton_harness_flag" ]]; then
+            printf '%s\n' "$_missing" >&2
+            exit 0
         fi
+        printf '%s\n' "$_missing"
+        exit 2
     fi
+    printf '%s\n' "$_missing"
+    exit 0
 fi
 
-# Precondition: nothing resolved to an executable binary. Emit the structured
-# precondition envelope on stdout so Claude Code surfaces the defect (rather
-# than a raw `exec: not found`), then exit 0 — hooks are non-blocking, and
-# installing the binary is /anton-core:setup's job.
-#
-# ANTON_DEFER_BOOTSTRAP_ERROR opts out of the print+exit path so a sourcing
-# script (scripts/core, used by skills) can emit its own skill-shape envelope
-# with a non-zero exit. Set non-empty by the caller before sourcing.
-if [[ ! -x "$ANTON_BIN" ]]; then
-    if [[ -z "${ANTON_DEFER_BOOTSTRAP_ERROR:-}" ]]; then
-        printf '%s\n' '{"status":"error","error":{"kind":"precondition_missing","reason":"binary_missing_run_setup","detail":"anton-core binary not found; run /anton-core:setup to install anton-core."}}'
-        exit 0
-    fi
-    # Deferred: the sourcing script inspects ANTON_BIN and emits its own
-    # envelope shape + exit code. Fall through.
-fi
+# _anton_payload_args — reads the hook payload from stdin once, byte-exact,
+# into _anton_payload (no read when stdin is a TTY), its session_id and
+# transcript_path into _anton_session_id and _anton_transcript_path, then
+# re-feeds the payload as the shell's stdin. The caller puts them ahead of
+# its args with `set --` (an empty array under `set -u` dies in /bin/bash
+# 3.2): a previous release's still-pinned binary reads only the flags.
+_anton_payload_args() {
+    _anton_payload="" _anton_session_id="" _anton_transcript_path=""
+    [[ -t 0 ]] && return 0
+    _anton_payload="$(cat; printf x)"
+    _anton_payload="${_anton_payload%x}"
+    _anton_session_id="$(_anton_payload_field session_id)"
+    _anton_transcript_path="$(_anton_payload_field transcript_path)"
+    exec < <(printf '%s' "$_anton_payload")
+}
 
-# Helper used by SessionEnd and PreCompact wrappers. Sets SESSION_ID from
-# Claude Code's stdin JSON payload for injection as --session-id, and sets
-# TRANSCRIPT_PATH from .transcript_path
-# for --transcript-path injection (fail→success pattern mining). Production
-# path: stdin is piped, jq is present, payload has session_id. TTY runs
-# (manual invocation, tests) or missing jq fall through with SESSION_ID and
-# TRANSCRIPT_PATH empty; the Go verb logs the skip.
-#
-# SESSION_ID and TRANSCRIPT_PATH are globals the calling wrapper reads after
-# invocation — the static linter cannot see the cross-file usage, so the
-# SC2034 disables below pin the contract instead of marking the vars unused.
-_extract_session_id() {
-    # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
-    SESSION_ID=""
-    # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
-    TRANSCRIPT_PATH=""
-    if [[ -t 0 ]] || ! command -v jq >/dev/null 2>&1; then
-        return 0
+# _anton_payload_field <key> — a top-level string of _anton_payload, empty on
+# any miss; jq preferred, else grep.
+_anton_payload_field() {
+    [[ -n "$_anton_payload" ]] || return 0
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$_anton_payload" | jq -r --arg k "$1" '.[$k] // empty | strings' 2>/dev/null || true
+    else
+        printf '%s' "$_anton_payload" \
+            | grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
+            | head -1 \
+            | sed -E 's/.*:[[:space:]]*"([^"]*)"$/\1/' \
+            || true
     fi
-    local payload
-    payload=$(cat)
-    if [[ -z "$payload" ]]; then
-        return 0
-    fi
-    # jq stderr is intentionally NOT muffled: a malformed payload should
-    # surface a parse error in the wrapper's stderr (which Claude Code
-    # captures) rather than collapse silently into SESSION_ID="". The
-    # trailing `|| true` keeps the wrapper non-blocking even when jq
-    # exits non-zero — the Go verb still receives an empty SESSION_ID
-    # and logs the skip per the non-blocking-hooks contract.
-    # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
-    SESSION_ID=$(printf '%s' "$payload" | jq -r '.session_id // empty' || true)
-    # shellcheck disable=SC2034  # read by sourcing wrapper after this returns
-    TRANSCRIPT_PATH=$(printf '%s' "$payload" | jq -r '.transcript_path // empty' || true)
 }
 
 # hook_exec_fail_open <verb> [args…] — run the engine subcommand and ALWAYS

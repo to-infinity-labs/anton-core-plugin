@@ -1,15 +1,16 @@
 # anton-core
 
-A personal AI assistant for Claude Code that remembers what matters, understands
+A personal AI assistant for Claude Code and Codex that remembers what matters, understands
 your codebase, and keeps your tasks and days in order — entirely on your own machine.
 
 ## What it does
 
-anton-core gives Claude Code a lasting memory and a working knowledge of your
-projects, so it stops starting from zero every session.
+anton-core gives Claude Code and the Codex CLI a lasting memory and a working
+knowledge of your projects, so they stop starting from zero every session. Use one or
+both: they share the same memory, whichever you install first.
 
 - **Remembers across sessions** — facts, decisions, and preferences persist, so you
-  stop re-explaining context every time you open Claude Code.
+  stop re-explaining context every time you open a session.
 - **Recalls instead of reconstructing** — ask what you know about something and get
   it back in seconds, past sessions included.
 - **Understands your codebase** — trace who calls a function, the blast radius of a
@@ -25,7 +26,7 @@ No account. No cloud. No login. Everything stays on your machine.
 
 ## Requirements
 
-- **Claude Code** — anton-core runs inside it as a plugin.
+- **Claude Code** or the **Codex CLI** (or both) — anton-core runs inside each as a plugin.
 - **macOS or Linux**, on Intel (`amd64`) or Apple/ARM (`arm64`). Windows is not supported.
 
 The correct binary for your platform is fetched and verified automatically the first
@@ -33,7 +34,8 @@ time you run setup — there's nothing to download by hand.
 
 ## Install
 
-Three steps, about a minute. Run the first two inside Claude Code.
+Three steps, about a minute. Below is Claude Code; Codex is [further down](#install-in-codex).
+Run the first two inside Claude Code.
 
 **1 — Add the marketplace and install the plugin**
 
@@ -61,6 +63,29 @@ only raises GitHub API rate limits.)
 
 You should see a healthy status and a summary of what's installed. If anything looks
 off, re-running `/anton-core:setup` repairs it in place.
+
+### Install in Codex
+
+From a terminal, add the marketplace and the plugin:
+
+```
+codex plugin marketplace add to-infinity-labs/anton-core-plugin
+codex plugin add anton-core@anton-core
+```
+
+Then, in a Codex session, run the setup skill:
+
+```
+$anton-core:setup
+```
+
+Setup trusts anton-core's hooks in your Codex config, lets Codex's sandbox write the
+memory store, and links the `anton` command into `~/.local/bin`. Downloading the
+binary needs network, which Codex's sandbox blocks, so approve that one step when
+setup asks. If Claude Code already has anton-core, Codex finds the same memory.
+
+In Codex every command below is written with `$` instead of `/` — `$anton-core:save`,
+`$anton-core:recall` and so on.
 
 ## Your first two minutes
 
@@ -97,12 +122,13 @@ From there:
 ## Staying current
 
 - **The engine** keeps itself up to date automatically — nothing to do.
-- **Commands and behavior** update with the plugin: `/plugin update anton-core`.
+- **Commands and behavior** update with the plugin, through each harness's plugin
+  manager — in Claude Code, `/plugin update anton-core`.
 
 ## Private by design — and verifiable
 
 anton-core keeps everything local. Your memory, tasks, and indexed code stay in files
-on your machine — there's no server to send them to and no account to create.
+under `~/.anton-core` on your machine — kept even if you uninstall, unless you ask setup to erase them — — there's no server to send them to and no account to create.
 
 The binary ships as a signed release artifact, and setup verifies it before it ever runs:
 

@@ -5,6 +5,44 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-10-11
+
+### Breaking
+
+- Your data lives in one place, `~/.anton-core`, whichever harness runs
+  anton-core. An existing Claude Code store is found and moved there
+  automatically, with no setup needed, and your memory stays reachable
+  throughout. A store kept elsewhere moves in once with `anton setup
+  relocate-data-root` (`--dry-run` shows the move first), which leaves a
+  symlink behind; `anton setup persist-data-dir` is gone.
+- `anton setup uninstall` keeps your data. It removes anton-core's settings
+  from each installed harness and the shell links; add `--purge-data` to
+  delete the data as well.
+
+### Added
+
+- anton-core runs in the OpenAI Codex CLI as well as Claude Code. Install it
+  with `codex plugin marketplace add to-infinity-labs/anton-core-plugin` then
+  `codex plugin add anton-core@anton-core`, and run `anton setup wire-harness
+  --harness codex` to trust its hooks and let them write to your data. Every
+  skill runs as `$anton-core:<skill>`, memory, recall, session capture and
+  usage work the same in both, and the two share one store.
+- `headless.runner` picks what runs background extraction and consolidation:
+  `auto` (Claude Code, else Codex), `claude` or `codex`.
+- Usage covers Codex models and plan headroom, and `anton usage` takes
+  `--harness`. The dashboard shows a headroom card per harness, a By harness
+  table, and a Harness column on Sessions when you use both.
+- `anton report health` checks each installed harness's wiring and names the
+  fix for anything missing, and `anton setup probe` lists the harnesses it
+  finds.
+- `anton dashboard --background` keeps the dashboard running until the
+  session that started it ends.
+
+### Fixed
+
+- Sessions record their real project, so the Sessions page and `anton session
+  list` match `anton usage --project` instead of reading `core` for every row.
+
 ## [3.1.0] - 2026-10-08
 
 ### Changed
@@ -563,7 +601,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.11.0...v3.0.0
 [2.11.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.10.0...v2.11.0

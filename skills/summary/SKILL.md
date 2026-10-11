@@ -12,7 +12,7 @@ Morning-briefing surface. Produces one overview of open tasks, the overdue and d
 
 - "summary", "what's due", "what's on my plate"
 - "daily briefing", "weekly recap", "upcoming tasks"
-- `/anton-core:summary` for the morning standup view
+- `summary` for the morning standup view
 
 ## How
 

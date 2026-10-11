@@ -12,7 +12,7 @@ Runs a fused search over the unified store — vector KNN, dual FTS across title
 
 - "find", "search", "look up", "what did I save about"
 - "show recent", "what repo handles X", "where is X defined"
-- `/anton-core:recall` with a query, type filter, or tag filter
+- `recall` with a query, type filter, or tag filter
 
 ## How
 

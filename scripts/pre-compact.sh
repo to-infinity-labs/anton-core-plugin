@@ -3,11 +3,11 @@
 # shellcheck source=lib/wrapper.sh disable=SC1091
 source "$(dirname "$0")/lib/wrapper.sh"
 
-_extract_session_id
-if [[ -n "$SESSION_ID" ]]; then
-    set -- --session-id "$SESSION_ID" "$@"
+_anton_payload_args
+if [[ -n "$_anton_transcript_path" ]]; then
+    set -- --transcript-path "$_anton_transcript_path" "$@"
 fi
-if [[ -n "$TRANSCRIPT_PATH" ]]; then
-    set -- --transcript-path "$TRANSCRIPT_PATH" "$@"
+if [[ -n "$_anton_session_id" ]]; then
+    set -- --session-id "$_anton_session_id" "$@"
 fi
 hook_exec_fail_open pre-compact "$@"

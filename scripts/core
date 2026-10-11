@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
-# Canonical skill-invocation surface. Sources lib/wrapper.sh (which
-# bootstraps the per-platform binary on first call AND owns the
-# authoritative-gated CLAUDE_PLUGIN_DATA -> CORE_DATA_DIR translation the
-# Go CLI's path-resolution layer reads), then
-# execs the binary. This shim only captures ANTON_DATA_DIR_AUTHORITATIVE
-# (before the CLAUDE_PLUGIN_DATA := default masks it) so wrapper.sh can
-# tell a Claude-Code-provided data root from an operator-shell default.
-# Hooks source lib/wrapper.sh directly; this is the equivalent entry
-# point for everything skills invoke. Terminal use does NOT come through
+# Canonical skill-invocation surface. Sources lib/wrapper.sh, which owns the
+# one data-root and pinned-binary resolver the Go CLI agrees with, then execs
+# the binary. Hooks source lib/wrapper.sh directly; this is the equivalent
+# entry point for everything skills invoke. Terminal use does NOT come through
 # here: /anton-core:setup installs a separate minimal launcher
 # (scripts/core-shim.sh -> <data>/data/bin/core) that the ~/.local/bin/anton
 # symlink points at, so a bare-shell `anton` execs the live
 # data/versions/current pointer instead of this version-pinned shim. Inside a
 # session that launcher delegates to bin/anton, which execs this shim.
 #
-# Symlink-safe: resolves $0 via readlink so $CLAUDE_PLUGIN_ROOT derives
+# Symlink-safe: resolves $0 via readlink so the plugin root derives
 # correctly even if this shim is itself reached through a symlink (dev
 # checkouts, test harnesses) -- otherwise dirname "$0" could misresolve.
 set -euo pipefail
@@ -52,185 +47,81 @@ while [[ -L "$_script_path" ]]; do
 done
 _script_dir="$(cd "$(dirname "$_script_path")" && pwd)"
 
-# Capture authoritativeness before the := default below masks it. Explicit
-# yes/no sentinel (NOT :=) so the value survives re-evaluation in the sourced
-# wrapper.sh: operator-shell (no CLAUDE_PLUGIN_DATA) writes a non-empty "no",
-# which wrapper.sh's presence test leaves as-is, so CORE_DATA_DIR is NOT pinned
-# and the Go resolver falls through to ~/.anton-core/config.json. Exported so
-# the sourced wrapper.sh honors it. Must run BEFORE the := default below.
-if [ -z "${ANTON_DATA_DIR_AUTHORITATIVE+x}" ]; then
-    if [ -n "${CLAUDE_PLUGIN_DATA+x}" ]; then
-        ANTON_DATA_DIR_AUTHORITATIVE=yes
-    else
-        ANTON_DATA_DIR_AUTHORITATIVE=no
-    fi
-fi
-export ANTON_DATA_DIR_AUTHORITATIVE
+# The plugin root wrapper.sh falls back to when the harness names none.
+_anton_self_root="$(cd "$_script_dir/.." && pwd)"
 
-# Non-authoritative (Bash-tool / operator-shell) invocation: resolve the data
-# root from ~/.anton-core/config.json (the documented operator-config tier)
-# BEFORE the cache default below, so binary location matches the data root the
-# binary itself would resolve. Setting CORE_DATA_DIR is load-bearing: it pins
-# the binary's resolver to step 1 and skips the dev-mode ./data probe (itself
-# gated behind CORE_DEV_MODE), which would otherwise mis-resolve when setup
-# runs from a cwd containing ./data.
-_data_root_source="authoritative"
-if [[ "$ANTON_DATA_DIR_AUTHORITATIVE" == "no" ]] && [[ -z "${CLAUDE_PLUGIN_DATA+x}" ]]; then
-    # Read the operator-config data root inline. wrapper.sh is not sourced yet
-    # (sourcing it now would run its bootstrap side effects), and we need the
-    # root before the cache default below masks CLAUDE_PLUGIN_DATA. The read is
-    # pure (one file), so inlining it here is cheaper than splitting wrapper.sh
-    # into side-effect-free and exec halves (a recorded follow-up).
-    _anton_cfg_root=""
-    _anton_cfg="${HOME:-}/.anton-core/config.json"
-    if [[ -f "$_anton_cfg" ]]; then
-        if command -v jq >/dev/null 2>&1; then
-            _anton_cfg_root="$(jq -r '.data_root // empty' "$_anton_cfg" 2>/dev/null || true)"
-        else
-            _anton_cfg_root="$(grep -E '"data_root"[[:space:]]*:[[:space:]]*"[^"]+"' "$_anton_cfg" 2>/dev/null \
-                | head -1 | sed -E 's/.*"data_root"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' || true)"
-        fi
-    fi
-    # Same normalisation as the binary's resolver: a root given as <root>/data
-    # would otherwise nest data/data, and /data or / resolve to / as they do there.
-    _anton_cfg_raw="$_anton_cfg_root"
-    _anton_cfg_root="${_anton_cfg_root%/}"
-    [[ "${_anton_cfg_root##*/}" == "data" ]] && _anton_cfg_root="${_anton_cfg_root%/data}"
-    [[ -z "$_anton_cfg_root" && -n "$_anton_cfg_raw" ]] && _anton_cfg_root="/"
-    if [[ -n "$_anton_cfg_root" ]]; then
-        CLAUDE_PLUGIN_DATA="$_anton_cfg_root"
-        CORE_DATA_DIR="$_anton_cfg_root"
-        export CLAUDE_PLUGIN_DATA CORE_DATA_DIR
-        _data_root_source="operator-config"
-    else
-        _data_root_source="cache-fallback"
-    fi
-fi
-export _data_root_source
-
-# Derive PLUGIN_ROOT from the resolved shim path; default PLUGIN_DATA
-# to PLUGIN_ROOT (matches the CLAUDE_PLUGIN_DATA fallback in
-# scripts/lib/wrapper.sh). Both are := defaults — any caller that
-# pre-sets these wins (Claude Code at skill invocation, the harness
-# in tests, the operator at the shell).
-: "${CLAUDE_PLUGIN_ROOT:=$(cd "$_script_dir/.." && pwd)}"
-: "${CLAUDE_PLUGIN_DATA:=$CLAUDE_PLUGIN_ROOT}"
-export CLAUDE_PLUGIN_ROOT CLAUDE_PLUGIN_DATA
-
-# --wrapper-check: operator probe. Resolves and prints the paths
-# without invoking the binary or triggering bootstrap. JSON via jq
-# when available; sed-escape fallback otherwise so the diagnostic
-# survives paths containing backslashes or doublequotes.
+# --wrapper-check: operator probe. Resolves and prints the paths without
+# invoking the binary. JSON via jq when available; sed-escape fallback
+# otherwise so the diagnostic survives backslashes or doublequotes.
 if [[ "${1:-}" == "--wrapper-check" ]]; then
-    version="$(grep -E '"version"' "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null \
-        | head -1 \
-        | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
-        || true)"
-    # Empty version means plugin.json was unreadable, malformed, or missing
-    # the field. The naive path would emit an envelope with bin_path ending
-    # in a trailing dash and bin_exists=false — a clean-looking diagnostic
-    # pointing at a phantom binary. Hard-fail instead so operators running
-    # --wrapper-check to diagnose breakage get an actionable error.
-    if [[ -z "$version" ]]; then
-        printf '{"status":"error","error":{"kind":"precondition_missing","reason":"missing_manifest_version","detail":"could not read .version from %s/.claude-plugin/plugin.json (missing, unreadable, or malformed); re-install the plugin or run /anton-core:setup"}}\n' \
-            "$CLAUDE_PLUGIN_ROOT" >&2
-        exit 2
-    fi
-    # Pin-based binary resolution, mirroring scripts/lib/wrapper.sh (hooks
-    # answer or enqueue). scripts/core NEVER fetches; this diagnostic
-    # reports the LIVE resolution so it cannot lie about which binary a
-    # `core <verb>` would exec. Precedence (same as wrapper.sh):
-    #   (1) the pin at data/state/installed-version → data/versions/v<ver>/anton-core;
-    #   (2) a repo-local dev build (bin/anton-core);
-    #   (3) a staged-but-not-rotated slot named by staged-update.json.
-    # The legacy data/bin/anton-core-v${version} layout is gone with the
-    # bootstrap deletion; resolving off it here would report a phantom path.
-    pin_file="$CLAUDE_PLUGIN_DATA/data/state/installed-version"
-    bin_path=""
-    if [[ -f "$pin_file" ]]; then
-        installed_version="$(head -1 "$pin_file" 2>/dev/null || true)"
-        installed_version="${installed_version#v}"
-        installed_version="${installed_version//$'\n'/}"
-        bin_path="$CLAUDE_PLUGIN_DATA/data/versions/v${installed_version}/anton-core"
-    fi
-    if [[ ! -x "$bin_path" ]] && [[ -x "$CLAUDE_PLUGIN_ROOT/bin/anton-core" ]]; then
-        bin_path="$CLAUDE_PLUGIN_ROOT/bin/anton-core"
-    fi
-    staged_state="$CLAUDE_PLUGIN_DATA/data/state/staged-update.json"
-    if [[ ! -x "$bin_path" ]] && [[ -f "$staged_state" ]]; then
-        if command -v jq >/dev/null 2>&1; then
-            staged_bin="$(jq -r '.binary_path // empty' "$staged_state" 2>/dev/null || true)"
-        else
-            staged_bin="$(grep -E '"binary_path"[[:space:]]*:[[:space:]]*"[^"]+"' "$staged_state" 2>/dev/null \
-                | head -1 \
-                | sed -E 's/.*"binary_path"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
-                || true)"
-        fi
-        if [[ -n "$staged_bin" ]]; then
-            # binary_path is written relative to the data dir; tolerate absolute.
-            case "$staged_bin" in
-                /*) : ;;
-                *)  staged_bin="$CLAUDE_PLUGIN_DATA/$staged_bin" ;;
-            esac
-            bin_path="$staged_bin"
-        fi
-    fi
-    if [[ -x "$bin_path" ]]; then
-        bin_exists=true
-    else
-        bin_exists=false
-    fi
-    # Report whether the resolved live binary path sits inside a
-    # Claude-Code-managed cache/marketplace clone (bootstrap-fetch.sh's
-    # install-refusal condition). bash 3.2 case glob; no realpath. An empty
-    # bin_path (nothing resolved) matches no cache glob → false.
-    case "$bin_path" in
-        */plugins/cache/*|*/plugins/marketplaces/*) bin_in_managed_cache=true ;;
-        *) bin_in_managed_cache=false ;;
-    esac
-    # Dev shortcut: when a contributor runs `make build`, the binary
-    # lands at $CLAUDE_PLUGIN_ROOT/bin/anton-core and wrapper.sh's
-    # dev-shortcut branch prefers it over the versioned cache. Surface
-    # both candidates so an operator running --wrapper-check to diagnose
-    # breakage in dev mode doesn't see a misleading bin_exists=false
-    # while the live invocation path is happily using the dev binary.
-    dev_bin="$CLAUDE_PLUGIN_ROOT/bin/anton-core"
-    if [[ -x "$dev_bin" ]]; then
-        dev_bin_exists=true
-    else
-        dev_bin_exists=false
-    fi
-    # Parse-check the sourced wrapper without sourcing it. Without this
-    # field a bash 4-only construct in wrapper.sh produces a clean
-    # --wrapper-check envelope (since the diagnostic exits before the
-    # source line) while the next `core <verb>` invocation explodes.
-    # Prefer /bin/bash on macOS so the strict bash-3.2 target is checked.
+    # Parse-check the sourced wrapper before sourcing it: a bash 4-only
+    # construct would otherwise explode on the next `core <verb>` while this
+    # diagnostic still looked clean. Prefer /bin/bash so macOS checks 3.2.
     if [[ -x /bin/bash ]]; then
         _wrapper_parse_bash=/bin/bash
     else
         _wrapper_parse_bash=bash
     fi
+    wrapper_parses=false
+    _anton_root=""
+    _anton_root_src=""
+    ANTON_BIN=""
+    ANTON_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-$_anton_self_root}}"
     if "$_wrapper_parse_bash" -n "$_script_dir/lib/wrapper.sh" 2>/dev/null; then
         wrapper_parses=true
-    else
-        wrapper_parses=false
+        # shellcheck source=lib/wrapper.sh disable=SC1091
+        ANTON_RESOLVE_ONLY=1 source "$_script_dir/lib/wrapper.sh"
+        # The live resolution, so the report cannot lie about which binary a
+        # `core <verb>` would exec; a drifted pin reports its missing slot.
+        [[ -n "$_anton_root" ]] && { _resolve_pinned_bin "$_anton_root" 2>/dev/null || true; }
     fi
-    # Reject control bytes in any field destined for the JSON envelope. The
-    # sed fallback only escapes `\` and `"`; a literal newline/tab/\x01–\x1f
-    # in $CLAUDE_PLUGIN_ROOT, $CLAUDE_PLUGIN_DATA, or $version (legal in
-    # POSIX paths) would silently produce invalid JSON. Hard-reject so the
-    # diagnostic never lies about its own output.
-    case "$CLAUDE_PLUGIN_ROOT$CLAUDE_PLUGIN_DATA$bin_path$dev_bin$version" in
+    version=""
+    for _manifest in "$ANTON_PLUGIN_ROOT/.claude-plugin/plugin.json" "$ANTON_PLUGIN_ROOT/.codex-plugin/plugin.json"; do
+        version="$(grep -E '"version"' "$_manifest" 2>/dev/null \
+            | head -1 \
+            | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+            || true)"
+        [[ -n "$version" ]] && break
+    done
+    # An empty version would report a phantom binary path; fail instead.
+    if [[ -z "$version" ]]; then
+        printf '{"status":"error","error":{"kind":"precondition_missing","reason":"missing_manifest_version","detail":"could not read .version from %s/.claude-plugin/plugin.json or .codex-plugin/plugin.json (missing, unreadable, or malformed); re-install the plugin or run the setup skill"}}\n' \
+            "$ANTON_PLUGIN_ROOT" >&2
+        exit 2
+    fi
+    bin_path="$ANTON_BIN"
+    if [[ -x "$bin_path" ]]; then
+        bin_exists=true
+    else
+        bin_exists=false
+    fi
+    # bootstrap-fetch.sh refuses to install inside a harness-managed cache or
+    # marketplace clone; report whether the live binary sits in one.
+    case "$bin_path" in
+        */plugins/cache/*|*/plugins/marketplaces/*) bin_in_managed_cache=true ;;
+        *) bin_in_managed_cache=false ;;
+    esac
+    # wrapper.sh prefers a `make build` binary over an empty pin; report it so a
+    # dev checkout does not read as bin_exists=false while it runs.
+    dev_bin="$ANTON_PLUGIN_ROOT/bin/anton-core"
+    if [[ -x "$dev_bin" ]]; then
+        dev_bin_exists=true
+    else
+        dev_bin_exists=false
+    fi
+    # The sed fallback escapes only `\` and `"`; a control byte (legal in POSIX
+    # paths) would emit invalid JSON, so refuse it.
+    case "$ANTON_PLUGIN_ROOT$_anton_root$bin_path$dev_bin$version" in
         *[[:cntrl:]]*)
-            printf '{"status":"error","error":{"kind":"precondition_missing","reason":"control_byte_in_path","detail":"resolved path or version contains a control byte (newline/tab/etc); refusing to emit corrupt JSON. Check CLAUDE_PLUGIN_ROOT and CLAUDE_PLUGIN_DATA."}}\n' >&2
+            printf '{"status":"error","error":{"kind":"precondition_missing","reason":"control_byte_in_path","detail":"resolved path or version contains a control byte (newline/tab/etc); refusing to emit corrupt JSON. Check the plugin root and CORE_DATA_DIR."}}\n' >&2
             exit 2
             ;;
     esac
     if command -v jq >/dev/null 2>&1; then
         jq -nc \
-            --arg pr  "$CLAUDE_PLUGIN_ROOT" \
-            --arg pd  "$CLAUDE_PLUGIN_DATA" \
-            --arg drs "${_data_root_source:-authoritative}" \
+            --arg pr  "$ANTON_PLUGIN_ROOT" \
+            --arg pd  "$_anton_root" \
+            --arg drs "$_anton_root_src" \
             --arg v   "$version" \
             --arg bp  "$bin_path" \
             --argjson be "$bin_exists" \
@@ -242,10 +133,10 @@ if [[ "${1:-}" == "--wrapper-check" ]]; then
     else
         _esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
         printf '{"plugin_root":"%s","plugin_data":"%s","data_root":"%s","data_root_source":"%s","version":"%s","bin":"%s","bin_exists":%s,"bin_in_managed_cache":%s,"dev_bin":"%s","dev_bin_exists":%s,"wrapper_parses":%s}\n' \
-            "$(_esc "$CLAUDE_PLUGIN_ROOT")" \
-            "$(_esc "$CLAUDE_PLUGIN_DATA")" \
-            "$(_esc "$CLAUDE_PLUGIN_DATA")" \
-            "$(_esc "${_data_root_source:-authoritative}")" \
+            "$(_esc "$ANTON_PLUGIN_ROOT")" \
+            "$(_esc "$_anton_root")" \
+            "$(_esc "$_anton_root")" \
+            "$(_esc "$_anton_root_src")" \
             "$(_esc "$version")" \
             "$(_esc "$bin_path")" \
             "$bin_exists" \
@@ -256,13 +147,6 @@ if [[ "${1:-}" == "--wrapper-check" ]]; then
     fi
     exit 0
 fi
-
-# The CLAUDE_PLUGIN_DATA -> CORE_DATA_DIR translation now lives in
-# scripts/lib/wrapper.sh (sourced below), gated on
-# ANTON_DATA_DIR_AUTHORITATIVE captured above. Operator-shell invocations
-# (no CLAUDE_PLUGIN_DATA) are non-authoritative, so wrapper.sh leaves
-# CORE_DATA_DIR unset and the Go resolver falls through to
-# ~/.anton-core/config.json instead of pinning the rotating cache.
 
 # Defer the hook-shape "exit 0 with envelope on stdout" path inside
 # wrapper.sh so the shim can re-emit a skill-shape error on stderr
@@ -309,7 +193,8 @@ rm -f "$_wrapper_src_err"
 # scripts/lib/bootstrap-fetch.sh), never this shim's; scripts/core stays
 # curl-free by contract.
 if [[ ! -x "${ANTON_BIN:-}" ]]; then
-    printf '{"status":"error","error":{"kind":"precondition_missing","reason":"binary_missing_run_setup","detail":"anton-core binary not found; run /anton-core:setup to install it."}}\n' >&2
+    # shellcheck disable=SC2016  # $anton-core:setup is Codex's skill syntax, not an expansion
+    printf '{"status":"error","error":{"kind":"precondition_missing","reason":"binary_missing_run_setup","detail":"anton-core binary not found; run the setup skill (/anton-core:setup, or $anton-core:setup in Codex) to install it."}}\n' >&2
     exit 2
 fi
 

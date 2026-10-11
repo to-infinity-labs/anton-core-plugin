@@ -11,8 +11,8 @@ Single operator surface for `Task`-typed items — list pending work, add new to
 ## When to use
 
 - "add task", "todo", "remind me to", "I need to"
-- "what tasks do I have", `/anton-core:tasks`
-- After `/anton-core:extract` surfaces action items worth persisting
+- "what tasks do I have", `tasks`
+- After `extract` surfaces action items worth persisting
 
 ## How
 

@@ -11,7 +11,7 @@ Removes one item from the knowledge base, cleaning every dependent row across th
 ## When to use
 
 - "remove from kb", "delete this id", "forget this"
-- `/anton-core:remove <identifier>` with an id or fuzzy keyword
+- `remove <identifier>` with an id or fuzzy keyword
 - Undoing a prior `save` for a single row
 
 ## How

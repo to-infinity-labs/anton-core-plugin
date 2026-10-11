@@ -1,26 +1,26 @@
 ---
-fragment-version: 1.8.0
+fragment-version: 1.9.0
 ---
 
 # Anton Core
 
-Personal AI assistant for knowledge, tasks, and daily productivity. Layers skills + hooks + SQLite (FTS5 + vector + graph) on top of Claude Code.
+Personal AI assistant for knowledge, tasks, and daily productivity. Layers skills + hooks + SQLite (FTS5 + vector + graph) on top of your coding harness, Claude Code or Codex.
 
 ## Use Anton Core — Not the Defaults
 
-Anton Core replaces Claude Code's default memory and code search in this setup, so use it for both.
+Anton Core replaces the harness's default memory and code search in this setup, so use it for both.
 
 ### Memory — Anton Core is your memory layer
 
-- **Save durable notes with `/anton-core:save`.** Decisions, preferences,
+- **Save durable notes with the `save` skill.** Decisions, preferences,
   corrections, facts and session learnings all go to Anton Core, the memory
-  store here: setup turns Claude Code's native auto memory off and imports
+  store here: setup turns the harness's native auto memory off and imports
   what it held. Where the operator kept native memory on, save to Anton Core
   all the same.
 - **Recall before you reconstruct.** Before non-trivial work,
-  `/anton-core:recall` what you already know, so you build on it rather than
+  `recall` what you already know, so you build on it rather than
   rebuilding it; widen with `expand` / `explore`.
-- **Curate, don't accrete.** Before saving, `/anton-core:recall` related
+- **Curate, don't accrete.** Before saving, `recall` related
   memories; if the new note updates or corrects one that already exists,
   `item update` (or `item delete`) it in place rather than appending a second
   version.
@@ -34,7 +34,7 @@ Anton Core replaces Claude Code's default memory and code search in this setup, 
 ### Code — the code graph is how you read code
 
 - **Find and traverse symbols through the graph.** Resolve a symbol with
-  `/anton-core:recall --code`, then walk it with `callers`, `callees`,
+  `recall --code`, then walk it with `callers`, `callees`,
   `impact`, `paths`, `cycles`. The graph resolves bindings, where grep matches
   strings.
 - **grep / `rg` is the fallback for code.** Use it for non-code text
@@ -47,16 +47,16 @@ Anton Core replaces Claude Code's default memory and code search in this setup, 
 1. **Local scope only** — limit file searches to the current project unless explicitly told otherwise
 2. **Meeting tasks are owner-only** — when extracting action items from transcripts, only create tasks for the configured owner, never other attendees
 3. **Batch bulk operations** — process multi-repo or large-scale work in batches of 10–15 with checkpoint files, and never run 50+ items in one session, so a long run stays within one session's context and an interrupted one resumes from its checkpoint
-4. **No Bash on internal Claude paths** — Don't `cp`/`mv`/`cat` paths containing `.claude/projects/`: it triggers an unbypassable sensitive-file prompt. Use Read + Write instead.
+4. **No shell on internal Claude Code paths** — In Claude Code, don't `cp`/`mv`/`cat` paths containing `.claude/projects/`: it triggers an unbypassable sensitive-file prompt. Use Read + Write instead.
 
 ## Your Toolset
 
-The tools you reach for while working. Each is a `/anton-core:<name>` skill; the command it runs uses noun-verb grammar (`anton <noun> <verb>`), shown below. The ⚙ rows under Intent Routing are the ones to use without being asked whenever a task matches the row; the rest run on request.
+The tools you reach for while working. Each is an anton-core skill, named bare below: invoke it as `/anton-core:<name>` in Claude Code and `$anton-core:<name>` in Codex. The command it runs uses noun-verb grammar (`anton <noun> <verb>`), shown below. The ⚙ rows under Intent Routing are the ones to use without being asked whenever a task matches the row; the rest run on request.
 
 - **Memory** — save (`anton item save`), extract (`anton item extract`), bulk-import (`anton item bulk-import`), remove (`anton item delete`), recall (`anton memory recall`), expand (`anton item get`), explore (`anton memory explore`), relate (`anton item relate|unrelate`), share (prompt-only, no backing command)
-- **Code Graph** — callers, callees, impact, paths, cycles — skills over the read-only `anton graph query <template>` surface (`--direction`, `--rel-types`); invoke them as `/anton-core:callers` etc.
+- **Code Graph** — callers, callees, impact, paths, cycles — skills over the read-only `anton graph query <template>` surface (`--direction`, `--rel-types`); invoke them as the `callers` skill etc.
 - **Activity** — tasks (`anton task add|list|due|groups|complete|update`), summary (`anton report summary`), sessions (`anton session list|get|stats|mark-reflected`), improvements (`anton improvement list|approve|dismiss`), usage (`anton usage stats|doctor|span`)
-- **System** — health (`anton report health`), dashboard (`anton dashboard`). Setup and maintenance are operator-invoked: when one is needed, ask the operator to run `/anton-core:setup` or `/anton-core:maintenance`
+- **System** — health (`anton report health`), dashboard (`anton dashboard`). Setup and maintenance are operator-invoked: when one is needed, ask the operator to run the `setup` or `maintenance` skill
 
 ## Intent Routing
 
@@ -64,33 +64,36 @@ The tools you reach for while working. Each is a `/anton-core:<name>` skill; the
 
 | Intent | Skill | |
 |---|---|---|
-| Save / store / "remember this" | `/anton-core:save` | ⚙ |
-| Search / recall / "find" | `/anton-core:recall` | ⚙ |
-| Expand on an id | `/anton-core:expand` | ⚙ |
-| Walk neighborhood | `/anton-core:explore` | ⚙ |
-| Extract action items / decisions | `/anton-core:extract` | ⚙ |
-| Link or unlink two memory items / "that edge is wrong" | `/anton-core:relate` | ⚙ |
-| Who calls a symbol | `/anton-core:callers` | ⚙ |
-| What a symbol calls | `/anton-core:callees` | ⚙ |
-| Blast radius of a change | `/anton-core:impact` | ⚙ |
-| Path between two symbols | `/anton-core:paths` | ⚙ |
-| Cycle detection | `/anton-core:cycles` | ⚙ |
-| Add task / reminder | `/anton-core:tasks add` | |
-| Daily briefing | `/anton-core:summary` | |
-| Token spend / "what did that cost" | `/anton-core:usage` | |
-| Audit a session's token numbers | `/anton-core:usage --session-id <id>` | |
-| Health / status | `/anton-core:health` | |
-| Open the browser dashboard | `/anton-core:dashboard [surface]` | |
+| Save / store / "remember this" | `save` | ⚙ |
+| Search / recall / "find" | `recall` | ⚙ |
+| Expand on an id | `expand` | ⚙ |
+| Walk neighborhood | `explore` | ⚙ |
+| Extract action items / decisions | `extract` | ⚙ |
+| Link or unlink two memory items / "that edge is wrong" | `relate` | ⚙ |
+| Who calls a symbol | `callers` | ⚙ |
+| What a symbol calls | `callees` | ⚙ |
+| Blast radius of a change | `impact` | ⚙ |
+| Path between two symbols | `paths` | ⚙ |
+| Cycle detection | `cycles` | ⚙ |
+| Add task / reminder | `tasks add` | |
+| Daily briefing | `summary` | |
+| Token spend / "what did that cost" | `usage` | |
+| Audit a session's token numbers | `usage --session-id <id>` | |
+| Health / status | `health` | |
+| Open the browser dashboard | `dashboard [surface]` | |
 
 ## Data Layout
 
-- `~/.anton-core/data/` — content files (`knowledge/`, `inbox/`, `daily/`, `logs/`, `skill-logs/`)
-- `${CLAUDE_PLUGIN_DATA}/data/` — `core.db`, state files
-- `${CLAUDE_PLUGIN_DATA}/config/` — user-edited overrides
-- `${CLAUDE_PLUGIN_ROOT}/` — read-only plugin source + templates
+One data root, `~/.anton-core`, shared by every harness:
+
+- `~/.anton-core/data/` — `core.db`, `events.db`, state files, `knowledge/` source copies, `logs/`
+- `~/.anton-core/config/` — user-edited overrides
+- `~/.anton-core/graphs/` — per-repo code-graph stores
+
+The plugin's own install dir is read-only source + templates.
 
 ## Conventions
 
 - **IDs**: prefixed by type — e.g. `conv-*`, `ref-*`, `task-*`
 - **Dates**: verify today's date from env before creating date-based filenames
-- **Binary invocation**: run the CLI as `anton <noun> <verb>` — the plugin's `bin/anton` launcher, which Claude Code puts on the Bash tool's `PATH` (main-session and subagent shells alike) while the plugin is enabled.
+- **Binary invocation**: run the CLI as `anton <noun> <verb>`. Claude Code puts the plugin's `bin/anton` launcher on the Bash tool's `PATH` (main-session and subagent shells alike) while the plugin is enabled; Codex shells reach it as `~/.local/bin/anton`, which setup links.

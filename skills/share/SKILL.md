@@ -11,7 +11,7 @@ Packages whatever the operator and assistant have been working on in the current
 ## When to use
 
 - "share this", "make this portable", "package this up"
-- `/anton-core:share <description>` with a 2-4 word slug of what to package
+- `share <description>` with a 2-4 word slug of what to package
 - When the assistant notices itself hand-crafting a portable document — stripping internal references, copying file contents verbatim, writing a self-contained intro — proactively suggest this skill rather than continue ad-hoc
 
 ## Behavior

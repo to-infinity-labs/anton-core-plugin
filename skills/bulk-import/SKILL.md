@@ -11,7 +11,7 @@ Walks a directory, classifies each file, and routes every file through the same 
 ## When to use
 
 - "bulk import this folder", "import this directory", "ingest this directory"
-- `/anton-core:bulk-import` against a known content tree
+- `bulk-import` against a known content tree
 - Backfilling a fresh database from an existing knowledge folder
 
 ## How

@@ -6,7 +6,7 @@ allowed-tools: Bash
 
 ## What it does
 
-Read-only diagnostic surface. Composes per-subsystem panels (memory invariants, code-graph resolution, query-stats templates, retrieval intelligence, extractor and consolidation progress, infrastructure) into a single envelope, classifies overall severity, and writes one trend-tracking row to `events.health_log`. Non-healthy panels carry a remediation hint; when an automated repair exists the hint includes a `fix` — the exact command to run (e.g. `anton maintenance repair --target fts` for a corrupt full-text index) — which the readout surfaces verbatim so the operator can act without a second roundtrip.
+Read-only diagnostic surface. Composes per-subsystem panels (memory invariants, code-graph resolution, query-stats templates, retrieval intelligence, extractor and consolidation progress, infrastructure) into a single envelope, classifies overall severity, and writes one trend-tracking row to `events.health_log`. Non-healthy panels carry a remediation hint; when an automated repair exists the hint includes a `fix` — the exact command to run (e.g. `anton maintenance repair --target fts` for a corrupt full-text index) — which the readout surfaces verbatim so the operator can act without a second roundtrip. The `quarantined_files` panel also carries `entries`, one per file with its own `fix`; the readout surfaces each entry's `fix` even when the panel is `healthy`, since a parser-defect-only panel reads healthy and carries no remediation hint.
 
 ## When to use
 

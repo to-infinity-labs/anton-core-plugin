@@ -5,6 +5,46 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-22
+
+### Added
+
+- The dashboard's graph page opens on your memory and explores one repo at
+  a time: click a node to open the level below it, with breadcrumbs back
+  up. No level draws more than 300 nodes, so large folders are grouped into
+  buckets instead of being cut off. Search finds a memory or a code symbol
+  by title or exact id and opens every level down to it, and the legend
+  hides or shows a type.
+- `anton graph views` lists one graph per repo, and `anton graph level`
+  reads one level of a repo's graph, or of memory, from the command line.
+- `anton report health` checks that every repo's graph view adds up to its
+  real counts.
+- `code_graph.max_file_bytes` (default 1 MiB, `0` for no cap) keeps the code
+  graph away from very large files: one over the cap is skipped without being
+  read, and `anton graph index --explain` says why.
+- `anton graph parse-reduce <file>` shrinks a file the parser stops on to a
+  small anonymized fragment that still stops it, so a parser bug can be
+  reported without sharing the source.
+
+### Fixed
+
+- A quarantined file you delete, ignore in `repos.json` or unregister leaves
+  the code graph and `anton report health` with it, instead of lingering as
+  a warning.
+- A parser defect in C#, Java, TypeScript/JavaScript, PHP, Go or Rust now
+  costs only the lines it stops on: the rest of the file is indexed and
+  marked `partial`. Health reports such a file as healthy, with a detail.
+- A crash is blamed only on a file that crashes again when parsed alone, so
+  a run killed from outside no longer quarantines whatever it was parsing.
+- Each quarantined file in `anton report health` names its class and the fix
+  that actually clears it, in place of "edit or remove the file".
+
+### Changed
+
+- The graph page draws every node of a level instead of cutting the graph
+  off at a node limit, so the truncation banner is gone. Each code graph
+  rebuilds from source once after updating.
+
 ## [4.0.0] - 2026-10-11
 
 ### Breaking
@@ -601,7 +641,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.0...HEAD
+[4.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v2.11.0...v3.0.0

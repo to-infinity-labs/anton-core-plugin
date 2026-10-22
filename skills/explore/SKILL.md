@@ -18,13 +18,16 @@ Walks the relationship graph outward from one seed item and returns every node a
 
 ```
 anton memory explore --seed-id <id> [--depth N] [--rel-types T1,T2] [--direction {out,in,both}] [--include-content] [--include-suppressed]
+anton graph level --view <slug> [--parent d:<dir>]
 ```
+
+For a directory's size and coupling map rather than one item's neighborhood, read a level of the repo's view: each child directory or file with its item count and internal edges, the links between children, and the links leaving the directory. `anton graph views` lists the views.
 
 The default walk hides edges an operator suppressed with `unrelate`; `--include-suppressed` shows them, each marked `suppressed: true`.
 
 ## Output
 
-Success envelope is a JSON object with `nodes` and `edges` arrays plus the `requested_depth` / `applied_depth` / `seed_bumped` echo fields. Each node carries `id`, `type`, `title`, `summary`, `kind`, `complexity`, and `hop_distance` (and `content` when `--include-content` was passed); each edge carries `source`, `target`, `rel_type`, and `weight`. Only the seed's `access_count` is bumped — walk traversal is not a touch. `memory explore` returns `{"status":"ok","nodes":[{"id":"...","type":"...","title":"...","hop_distance":N}],"edges":[{"source":"...","target":"...","rel_type":"..."}],"requested_depth":N,"applied_depth":N,"seed_bumped":true}`. Contract: `memory-explore` in the anton-core CLI contract.
+Success envelope is a JSON object with `nodes` and `edges` arrays plus the `requested_depth` / `applied_depth` / `seed_bumped` echo fields. Each node carries `id`, `type`, `title`, `summary`, `kind`, `complexity`, and `hop_distance` (and `content` when `--include-content` was passed); each edge carries `source`, `target`, `rel_type`, and `weight`. Only the seed's `access_count` is bumped — walk traversal is not a touch. `memory explore` returns `{"status":"ok","nodes":[{"id":"...","type":"...","title":"...","hop_distance":N}],"edges":[{"source":"...","target":"...","rel_type":"..."}],"requested_depth":N,"applied_depth":N,"seed_bumped":true}`. Contract: `memory-explore` in the anton-core CLI contract. `graph level` returns `{"status":"ok","source":"canonical","breadcrumb":[{"id":"r:","label":"..."},{"id":"d:...","label":"..."}],"nodes":[{"id":"f:...","label":"...","node_kind":"file","descendants":N,"children":N,"internal_edges":N,"expandable":true}],"links":[{"source":"...","target":"...","weight":N}],"boundary_links":[{"source":"...","target":"...","weight":N}],"wells":[],"clusters":[],"totals":{"descendants":N,"edges":N},"warnings":[]}`. Contract: `graph-level`.
 
 ## See also
 

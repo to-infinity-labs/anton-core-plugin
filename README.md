@@ -124,6 +124,11 @@ From there:
 - **The engine** keeps itself up to date automatically — nothing to do.
 - **Commands and behavior** update with the plugin, through each harness's plugin
   manager — in Claude Code, `/plugin update anton-core`.
+- **In Codex 0.166 and later**, a plugin update asks you to review anton-core's
+  hooks the next time Codex starts: choose "Trust all", or run
+  `anton setup wire-harness --harness codex`. If you only run headless
+  `codex exec`, run that command after updating; until then Codex skips the
+  hooks, and `$anton-core:health` says so.
 
 ## Private by design — and verifiable
 

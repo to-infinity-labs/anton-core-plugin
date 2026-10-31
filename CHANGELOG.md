@@ -5,6 +5,50 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-10-31
+
+### Fixed
+
+- anton-core's hooks run again under Codex 0.166 and later. Codex 0.166
+  changed how it records a trusted plugin hook, and setup's trust entries no
+  longer matched, so Codex skipped every anton-core hook. Run
+  `anton setup wire-harness --harness codex` once after upgrading; `anton
+  report health` says so when Codex's trust and anton-core's disagree.
+  After any plugin update, Codex 0.166 and later asks you to review
+  anton-core's hooks at startup: choose "Trust all", or run `anton setup
+  wire-harness --harness codex`. If you only run headless `codex exec`, run
+  wire-harness after updating.
+- Updating anton-core no longer stalls for Codex users. Every plugin
+  update changes what Codex fingerprints, and an install from 4.1.0 has no
+  fingerprint at all, so `anton report health` marked the hooks critical and
+  the update held itself back. That case now warns and names the fix, `anton
+  setup wire-harness --harness codex`; anton-core still never re-trusts its
+  hooks on its own.
+- A markdown file the parser stops on is now indexed `partial` instead of
+  quarantined whole: a bad inline span costs only its lines and a bad block
+  only that block. Files without a final newline index cleanly, and
+  `anton graph parse-reduce` shrinks markdown stops too.
+
+## [4.1.1] - 2026-10-31
+
+Not published: the release's upgrade check failed before publishing. Every change below ships in 4.1.2.
+
+### Fixed
+
+- anton-core's hooks run again under Codex 0.166 and later. Codex 0.166
+  changed how it records a trusted plugin hook, and setup's trust entries no
+  longer matched, so Codex skipped every anton-core hook. Run
+  `anton setup wire-harness --harness codex` once after upgrading; `anton
+  report health` says so when Codex's trust and anton-core's disagree.
+  After any plugin update, Codex 0.166 and later asks you to review
+  anton-core's hooks at startup: choose "Trust all", or run `anton setup
+  wire-harness --harness codex`. If you only run headless `codex exec`, run
+  wire-harness after updating.
+- A markdown file the parser stops on is now indexed `partial` instead of
+  quarantined whole: a bad inline span costs only its lines and a bad block
+  only that block. Files without a final newline index cleanly, and
+  `anton graph parse-reduce` shrinks markdown stops too.
+
 ## [4.1.0] - 2026-10-22
 
 ### Added
@@ -641,7 +685,8 @@ This file is the source of the notes published on each GitHub release.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.0...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.2...HEAD
+[4.1.2]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.0...v4.1.2
 [4.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.0.0...v3.1.0

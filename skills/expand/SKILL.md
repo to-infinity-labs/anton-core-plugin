@@ -1,31 +1,35 @@
 ---
 name: expand
-description: Pulls the full body of memory ids that recall returned. Use for reading an id in full before quoting or editing it, and gestures like 'tell me more about X' or 'show full content'. Pairs with `explore` to widen to neighbors.
+description: Shows the full content of saved memories by id. Use for 'show me the full content of item ref-…', 'expand that id', 'tell me more about it', or reading a recall hit before quoting it. Pairs with `explore`.
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Fetches full content for one or more memory items by id. Multi-id calls also upsert pairwise co-access rows into `co_access_pairs` between the touched items — the system's primary engagement signal — so the retrieval graph learns which rows the operator looked at together. Natural follow-up to `recall`: recall's per-hit ids (`items[].id`) are the input.
+Fetches the full body of one or more memory items by id. Fetching two or more together records that they were read together, which teaches retrieval what belongs with what. Natural follow-up to `recall`: its hit ids are the input.
 
 ## When to use
 
-- "tell me more about <id>", "expand on <id>"
-- "show full content of <id>" or "give me the body of these ids"
-- Chaining after `recall` to drop the summary in favour of the full body
+- "show me the full content of <id>", "expand on <id>", "tell me more about <id>"
+- "give me the body of these ids"
+- After `recall`, to read a hit in full rather than its snippet
 
 ## How
+
+Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
 
 ```
 anton item get --ids <id1>,<id2>[,...] [--session-id <sid>] [--include-relationships] [--no-bump]
 ```
 
-The skill's user-facing surface is `expand`; the underlying CLI verb is `get`. An operator typing the verb directly should use `get`. The verb keeps only the first `tools.expand_batch_cap` ids (default 10) and drops the rest without listing them in `missing_ids`, so split a longer list across calls.
+The verb reads the first 10 ids and drops the rest without naming them, so split a longer list across calls. `--include-relationships` adds each item's inbound and outbound edges, suppressed ones marked.
 
 ## Output
 
-Success envelope carries `items` (input-order array of `{id, type, title, summary, content}` rows — each also carrying `tags`, `created`, and `last_accessed` when the row has them), `count` (number of resolved rows), `co_access_pairs_added` (pairwise co-access rows upserted on this call), `missing_ids` (any ids that didn't resolve), and — under `--include-relationships` — `relationships` (outbound edges per resolved id). With two or more resolved ids, one row per unordered pair is upserted into `co_access_pairs`. `item get` returns `{"status":"ok","items":[{"id":"...","type":"...","title":"...","summary":"...","content":"..."}],"count":N,"co_access_pairs_added":N,"missing_ids":[...]}`. Contract: `item-get` in the anton-core CLI contract.
+`items` is in input order, each with its full `content`; `missing_ids` lists ids that resolved to nothing. Quote from `content`, not from the recall snippet.
+
+Contract: `item-get` in the anton-core CLI contract.
 
 ## See also
 
-- [`explore`](../explore/SKILL.md) — widens around a single id into its graph neighborhood; `expand` deepens one batch of ids into full bodies.
+- [`explore`](../explore/SKILL.md) — widens around one id into its neighborhood.

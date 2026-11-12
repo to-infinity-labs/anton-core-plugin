@@ -1,27 +1,30 @@
 ---
 name: summary
-description: Builds a daily or weekly briefing of open tasks, overdue, due-today, completed-recent, and stats. Use for "summary", "what's due", "what's on my plate", "daily briefing", or "weekly recap".
+description: Builds the operator's daily or weekly briefing — open, overdue and due tasks, recent work, new knowledge, spend. Use for 'give me my daily briefing', 'what's on my plate', 'what's due' or 'weekly recap'.
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Morning-briefing surface. Produces one overview of open tasks, the overdue and due-today slices, recently-completed work, knowledge gaps, session-intelligence counters, and a stats footer — composed from a single round-trip into the summary-rollup handler. `my_tasks` is every open task across all groups (what `task list --all` returns, not the inbox-only bare `task list`); `team_tasks` carries the operator-vs-team split.
+One read-only rollup for a day or a week: the operator's open tasks across every group, the team's split, overdue and due-today slices, what was completed, recent saves, searches that found nothing, session counters and model-token spend.
 
 ## When to use
 
-- "summary", "what's due", "what's on my plate"
-- "daily briefing", "weekly recap", "upcoming tasks"
-- `summary` for the morning standup view
+- "give me my daily briefing", "what's on my plate", "what's due today"
+- "morning summary", "weekly recap", "upcoming tasks"
 
 ## How
+
+Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
 
 ```
 anton report summary [--date <YYYY-MM-DD>] [--period daily|weekly]
 ```
 
-Default anchors on today's UTC date with the `daily` period (one-day `completed_recent` window); `--period weekly` widens that window to seven days. The verb is read-only and returns data; render the briefing from the envelope.
+`--date` defaults to today in local time; `--period weekly` widens the completed window to seven days. Render a briefing from the result, never the raw JSON.
 
 ## Output
 
-`report summary` returns `{"status":"ok","owner":"...","period":"<daily|weekly>","ref_date":"...","my_tasks":{...},"team_tasks":{...},"overdue":{...},"due_today":{...},"completed_recent":{...},"stats":{...},"session_intelligence":{...},"search_misses":{...},"recent_items":{...},"compress_saved":{...},"token_usage":{...},"task_groups":[...],"inbox_open":N,"connections_opened":1}`. The single consolidated envelope carries `owner`, `period`, `ref_date`, plus the `my_tasks`, `team_tasks`, `overdue`, `due_today`, `completed_recent`, `stats.counts`, `session_intelligence`, `search_misses`, and `recent_items` blocks — each with its own item list and count. It also always carries `compress_saved` (`{bytes_saved, tokens_saved_est}`), `token_usage` (`{total_tokens, estimated_usd}` — model-token spend over the window from the token-usage ledger's transcript-sourced rows, priced from the bundled table with the operator's `usage.pricing_overrides` applied, the same pricing `usage stats` uses; `estimated_usd` is `null` when the read degraded or a model is unpriced, `0` on a genuinely empty window), and `connections_opened` (fixed at `1` by the single-connection invariant). A `graph_growth` string (formatted `Knowledge graph: edges +N, themes +M since <ref_date>`) is present only when the window saw growth; it is omitted on an idle day or when the growth read degrades. Contract: `report-summary` in the anton-core CLI contract.
+Blocks `my_tasks`, `team_tasks`, `overdue`, `due_today`, `completed_recent`, `recent_items`, `search_misses` (recalls that returned nothing over 30 days — gaps worth filling), `session_intelligence` and `stats`, each with its items and count. `token_usage.estimated_usd` is an estimate; `null` means it could not be priced, never zero spend. `graph_growth` appears only on a day the knowledge graph grew.
+
+Contract: `report-summary` in the anton-core CLI contract.

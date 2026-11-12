@@ -1,34 +1,36 @@
 ---
 name: callers
-description: Finds every function that calls a symbol, direct or transitive. Use for tracing call sites in an indexed repo instead of grepping, and gestures like 'what calls X' or 'who uses X'. Pairs with `callees` for the downstream direction.
+description: Lists every function that calls a function or method, directly or transitively, from the code graph. Use for 'which functions call X', 'who calls X', 'find usages of X' or 'where is X called from', instead of grep or recall.
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Walks `CALLS` edges backward from a symbol-id to surface every caller — direct and transitive — up to a depth bound. Answers "who depends on this function?" without leaving the code-graph surface. The mirror of `callees`: same template family, opposite direction. Edges are sourced at the enclosing function or method, so each caller returned is the calling function itself, not merely its containing file.
+Walks `CALLS` edges backward from a symbol to every caller, direct and transitive, up to a depth bound. Edges are sourced at the enclosing function or method, so each caller is the calling function itself, not its file.
 
 ## When to use
 
-- "what calls X", "who uses X", "find usages of X"
+- "which functions call X", "who calls X", "what uses X", "find usages of X"
 - "where is X called from", "/callers X"
-- After landing on a symbol via `recall --code` and needing its upstream surface
+- After `recall --code` lands on a symbol and you need its upstream surface
 
 ## How
+
+Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
 
 ```
 anton graph query transitive-walk --seed-id <id> --direction in --rel-types CALLS --depth N [--exclude-ambiguous] [--repo <slug>]
 anton graph level --find <name> --view <slug>
 ```
 
-When several symbols share a name, `graph level --find` tells them apart by the chain of directories and files that reaches each. Resolve `<symbol>` first via the [recall](../recall/SKILL.md) skill unless the input already looks like a symbol-id. With `--paths-to <Y>`, reroute to `paths-between Y X` instead — the walker enumerates explicit call chains rather than the caller fan-out. From a cwd outside any checkout of the repo, pass `--repo <slug>` to walk the registered repo's graph. A linked worktree has its own graph store: a walk inside one, or `--repo <parent-slug>` from inside it, answers for its branch.
+`--seed-id` takes a symbol id: resolve a name with `anton memory recall --code --query <name>` first, unless the input already is one. When several symbols share a name, `graph level --find` tells them apart by the chain of directories and files that reaches each. For "how does Y reach X", use the [paths](../paths/SKILL.md) skill instead. Outside any checkout of the repo, pass `--repo <slug>`; inside a linked worktree the walk answers for its branch.
 
 ## Output
 
-A `transitive-walk` envelope — top-level `status`, `template` (the discriminator, here `"transitive-walk"`), `rows`, `nodes`, `row_count`, `limit_value`, `truncated`, and `truncated_reason`. One row per visited symbol, sorted `hop ASC, id ASC`, each carrying its `id`, `hop`, `path[]`, `edge_types[]`, `confidence_chain[]`, and `min_confidence` from the per-edge `relationships.confidence` column; `nodes` maps each id to its `{title, kind}`. One `query_log` row is written regardless of success, timeout, or truncation. `graph query` returns `{"status":"ok","template":"transitive-walk","rows":[{"id":"...","hop":N,"path":[...],"edge_types":[...],"confidence_chain":[...],"min_confidence":"..."}],"nodes":{"<id>":{"title":"...","kind":"..."}},"row_count":N,"limit_value":N,"truncated":false,"truncated_reason":null}`. Contract: `graph-query` in the anton-core CLI contract. `graph level --find` returns `{"status":"ok","source":"canonical","breadcrumb":[],"nodes":[],"links":[],"boundary_links":[],"wells":[],"clusters":[],"totals":{"descendants":0,"edges":0},"warnings":[],"matches":[{"id":"...","label":"...","view":"...","item_kind":"...","chain":[{"id":"r:","label":"..."},{"id":"f:...","label":"..."}]}]}`, each match's `chain` running from the repo root to the file that holds it. Contract: `graph-level`.
+One row per path, sorted by hop: a caller reached by two paths appears twice, so count distinct `id`s for "how many callers". `nodes` maps each id to its title and kind. An unknown seed id or rel-type is an error, not an empty result. A `warnings` entry says the store is still building or stale and what to tell the operator.
 
-**Read `warnings` before reporting an empty result.** Readying the store can leave an advisory: `worktree_building` means a linked worktree's store is still being built in the background, so `rows` covers only what is indexed so far; `store_rebuilding` means the store sat at an older schema version and is being regenerated in the background, so `rows` is empty until it finishes; `reconcile_failed` means the store could not be brought up to date with the working tree, so `rows` may be stale. Say so and re-run shortly rather than reporting the empty or partial set as the answer. A store written by a *newer* binary is different: the verb exits **3** with `schema_skew`, and so would `graph index` or `repos sync`, which refuse to touch it. The remedy there is to restart the session so it runs the newer binary; do not suggest re-indexing.
+Contract: `graph-query`, `graph-level` in the anton-core CLI contract.
 
 ## See also
 
-- [`callees`](../callees/SKILL.md) — same template, opposite direction: forward walk down the symbol's outgoing `CALLS` edges.
+- [`callees`](../callees/SKILL.md) — same walk, forward.

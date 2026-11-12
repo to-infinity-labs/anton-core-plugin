@@ -1,27 +1,34 @@
 ---
 name: remove
-description: Removes one item from the knowledge base by id, title, or fuzzy keyword. Use for "remove from kb", "delete this id", "forget this", or undoing a prior save.
+description: Deletes one saved memory for good, found by id, title or keyword. Use for 'forget the note titled X', 'forget this', 'delete item ref-…' or 'remove that from memory'.
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Removes one item from the knowledge base, cleaning every dependent row across the unified store (items, sidecars, FTS, vector index, tags, relationships, co-access pairs) and deleting the on-disk content file. Resolves an identifier — id, exact title, or fuzzy keyword — into one row, previews what will go, then cascades the delete on confirmation.
+Deletes one memory item and everything hanging off it — its search entries, vectors, tags, edges and stored file. Irreversible, so it previews and confirms first.
 
 ## When to use
 
-- "remove from kb", "delete this id", "forget this"
-- `remove <identifier>` with an id or fuzzy keyword
-- Undoing a prior `save` for a single row
+- "forget the note titled X", "forget this", "remove that from memory"
+- "delete <id>", undoing a prior `save`
 
 ## How
 
+Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
+
 ```
-anton item delete --id <id> [--dry-run]
+anton memory recall --query <title or keyword> --limit 5
+anton item delete --id <id> --dry-run
+anton item delete --id <id>
 ```
 
-The skill's user-facing surface is `remove`; the underlying CLI verb is `delete`. An operator typing the verb directly should use `delete`. The skill itself routes through `delete` transparently after resolving the identifier (via `recall` for fuzzy matches).
+1. **Resolve.** Given an id, use it. Given a title or keyword, run the recall and show the hits as a numbered list (id, type, title); take the operator's pick. With a single exact title match, still show it and confirm.
+2. **Preview.** Run the `--dry-run` and tell the operator what will go.
+3. **Delete** on their confirmation. To correct a record rather than lose it, use the [update](../update/SKILL.md) skill instead.
 
 ## Output
 
-Success envelope reports `status`, `id`, and `deleted` (boolean). `item delete` returns `{"status":"ok","id":"...","deleted":true}`. A real delete of an existing row returns `deleted:true`. Deleting a nonexistent id is not a `deleted:false` success — it hard-errors with `{"error":{"kind":"entity_not_found","detail":"entity not found: item \"<id>\" not found"}}`. `deleted:false` appears only under `--dry-run`, where the envelope also carries `dry_run:true` and reports what the delete would remove without writing. A `warnings` array of non-fatal cascade notes (e.g. a source file under the knowledge dir that could not be resolved or unlinked) is present only when the delete produced at least one. Contract: `item-delete` in the anton-core CLI contract.
+`deleted: true` once the item is gone; under `--dry-run` it is `false` with `dry_run: true`, and nothing was written. An id that names no item is `entity_not_found`. A `warnings` entry is a dependent file that could not be removed; relay it.
+
+Contract: `memory-recall`, `item-delete` in the anton-core CLI contract.

@@ -5,6 +5,513 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-11-12
+
+5.0.1 upgrades from 4.0.0 or later only. A store from 3.x or earlier is
+refused with `store_too_old` (exit 3) and left untouched; every hook still
+exits 0, and the session-start briefing says what to do. From 3.x, upgrade in
+two steps: run `anton bootstrap --version v4.1.2`, start one session so the
+store migrates, then update to 5.0.1. An updater from 2.0.0 to 3.1.0 holds the
+update and keeps its binary.
+
+### Changed
+
+- The dashboard carries the anton-core mark in its favicon and sidebar
+  header, on a dark tile, and its accent, focus ring and chart colours are
+  cyan.
+- The Go module path is `github.com/to-infinity-labs/anton-core-go`.
+- The routing fragment (2.0.0) is shorter, sends code questions straight to
+  the graph skills, and adds the Claude-only path rule only to Claude Code's
+  instructions file.
+- Every skill's description and Output section was rewritten against the real
+  CLI, and each skill tells the agent to run its command and answer from the
+  output.
+- Code-graph store advisories now tell the agent what to say to the operator.
+- Error and help text names `anton`, not the retired `core`, and
+  `report summary --date` help says it defaults to today in local time.
+- `--json-schema` for `report health`, `report summary`, `maintenance run`,
+  `maintenance consolidate`, `hook session-start` and `hook pre-compact` now
+  declares every field those commands emit, and a health check object is
+  closed (`additionalProperties: false`).
+- Whether a file's parse stops no longer depends on how busy your machine
+  is. Each parse is now limited by how much work it does
+  (`code_graph.parse_work_per_byte`, default 30 per byte), not by a clock,
+  so a large file that timed out under load now indexes. The limit matches
+  the parser's own, so nothing that indexed before stops now.
+- `code_graph.parse_timeout_ms` is now a safety net for all of one file's
+  parsing together, default 120 seconds. An install still on the old
+  10-second default moves to 120 seconds on upgrade; a value you set is
+  kept.
+- Every file that was quarantined or partly indexed is parsed once more on
+  the next index after upgrading.
+- `summarize.max_budget_usd` now defaults to $1.00, and it also sets how much
+  of a session's transcript is sent. A long session is cut to fit the cap, and
+  the summariser is told so.
+- The raw output is saved to disk only when compression actually rewrites
+  it, and the note under the compressed output gives that file's full path.
+- The dashboard symbol page reads only the code-graph store that owns the
+  symbol, so it opens faster.
+- A full-pipeline save commits its extracted items in one transaction.
+- `memory recall` answers questions: when no item holds every word, it
+  retries on half of the question's content words.
+- `memory recall` finds Chinese, Japanese and other unspaced text by word,
+  through a new trigram index (migration 0045). Existing items are indexed
+  on the first start after upgrading.
+- `memory recall --docs`/`--all` snippets show the matching passage of a
+  long document instead of its opening.
+- An item saved with importance 0 ranks below others instead of being
+  treated as importance 1.
+- Co-access links built by `item get` are capped and fade over 30 days, so
+  an often-fetched unrelated item no longer outranks an exact match.
+- `memory recall` leaves out the `error` and `pattern` items recall-on-error
+  mines, unless `--type`/`--include-types` names them; `--on-error` still
+  uses them.
+- recall-on-error searches only the first 4 KiB of a failed command's
+  stderr.
+- `recall-on-error doctor` reports a recall failure as an error rather than
+  "no candidate", and decides exactly as the hook does.
+- `memory recall` and `item get` still answer when their access bookkeeping
+  cannot be written, with a `bookkeeping_failed` warning; `item get` then
+  reports `co_access_pairs_added: 0`.
+- `memory explore` returns at most 500 nodes and reports `truncated`.
+  `seed_bumped` is false when the bump was skipped.
+- `update apply-if-staged` refuses a staged version older than or equal to
+  the installed one (`refused: not_newer`) unless `--force` is given or the
+  version came from `anton bootstrap --version`.
+- A version staged by bootstrap-fetch is signature-checked and rehearsed
+  before it is applied, and `update status` reports it `staged_validated:
+  false` until then.
+- A release tag that is not semver stages nothing.
+- `--wrapper-check` prints its envelope without jq.
+- A job's Codex model and effort keys, and the efforts the effort key
+  accepts, come from the harness table rather than a copy in config.
+- The release pipeline runs as verify, build, sign, exec-matrix,
+  harness-smoke and publish jobs, with a signed-tag guard, a per-target exec
+  matrix (darwin/amd64 under Rosetta) and a pull-request rehearsal of verify
+  and build.
+- Claude Code's hooks pass `--harness claude`, which decides whose payload it
+  is, so a Claude Code payload carrying a turn id is no longer read as
+  Codex's. Codex's hooks are unchanged.
+- `report health` reports each fact in one check: `graph_worktrees` is gone
+  (`repos status` lists each repo's worktrees), `code_graph.query_stats`,
+  `retrieval_intelligence` and `retrieval_fusion` run only under `--full`,
+  and `harness_wiring` leaves native memory to the `native_memory` check.
+- `report health --trend` compares this run with the 9 logged runs before
+  it.
+- `db check` also checks the memory invariants `report health` reads, and
+  fails with `db_corrupt` naming each critical one that is violated.
+- `improvement dismiss` keeps the suggestion, with state `dismissed`, so deep
+  analysis never offers it again. `improvement list` rows carry `state`,
+  newest first, with dismissed ones left out. Suggestions live in a table of
+  their own rather than the item store (migration 0044).
+- Deep analysis shows the model each flagged session's headline and facets
+  and every suggestion already made, dismissed ones included. After a failed
+  run it waits 1 hour, then 6, then 24 before trying again.
+- `usage span` sorts commands into generic classes (`tests`, `build`, `git`,
+  `search`, `agent`, `operator`, `other`); `gates` and `bb_wait` are gone,
+  and `usage.span_sdlc_patterns` adds classes of your own.
+- `usage stats` gives each harness's headroom its own age, so a fresh Claude
+  Code reading no longer hides a stale Codex one.
+- `repos remove --prune` changes nothing: the repo's store is removed either
+  way, and `pruned` counts what that store held.
+- `item get --include-relationships` reports each edge's `origin`
+  (`judge:<pass>-<run>`, `explicit-ref`, `extracted` or `manual`); edges
+  written before this release carry none.
+- `repos add` records `SLUG_COLLISION` when it mints a suffixed slug.
+  `BOOTSTRAP_TAKEOVER`, `BOOTSTRAP_PEER_DONE`, `MODULE_PATH_SWEEP_FAILED` and
+  `CONFIGS_IMPORT_FAILED` leave the event vocabulary.
+
+### Added
+
+- An `update` skill corrects a saved memory in place.
+- The dashboard's `/healthz` sends `X-Anton-Dashboard-Pid`, so the dashboard
+  skill finds and stops its server with `curl` alone, without `lsof` or `ps`.
+- Setup checks for macOS or glibc Linux plus `bash`, `git` and `curl` first,
+  and names whatever is missing.
+- The README lists what leaves your machine and how to turn each off, plus a
+  Support section; `SECURITY.md` ships, pointing to GitHub private
+  vulnerability reporting.
+- `anton bootstrap --from <dir>` installs from release files you downloaded
+  yourself, for a machine that cannot reach GitHub. It checks them exactly as
+  a download is checked.
+- A file that needs more parsing work than the limit allows is reported as
+  class `work_limit`, a warning, with its fix in `anton report health`.
+  Raise `code_graph.parse_work_per_byte` to index it.
+- `anton graph parse-reduce --work-per-byte N` sets the limit for a
+  reduction.
+- `update rollback` refuses to cross a breaking migration (`schema_skew`);
+  `--restore-snapshot` restores the pre-migrate snapshot (writes since it
+  are lost) and lists it under `restored`.
+- Releases ship a CycloneDX SBOM per binary, and the plugin tree ships
+  `SBOM.cyclonedx.json`.
+- The plugin tree ships `licenses/` with `THIRD_PARTY_LICENSES.md`, the
+  licence and notice files of every Go module and vendored asset in the
+  binary.
+- `maintenance repair --target invariants` deletes tags and relationships
+  naming a missing item and vectors nothing maps to an item. Migration 0049
+  does the same once on upgrade, and an update's rehearsal repairs its
+  sandbox before judging it, so a store holding them no longer stalls an
+  update.
+- `report health` checks `headless_model` (a job whose engine refused its
+  model, with the `config set` that fixes it), `token_ledger_failures` (fixed
+  by `anton usage doctor --all --repair`), `watch` (degraded once the inotify
+  watch limit is reached) and `vector_identity` (a store whose vectors another
+  embedder made). `data_root` warns when the data folder is on a network or
+  FUSE filesystem.
+- `watch status` reports `degraded`, with the reason.
+- Config keys `vision.max_budget_usd` (default $0.25, the spend cap for one
+  OCR call), `usage.span_sdlc_patterns` (default none) and
+  `code_graph.worktree_store_cap` (default 20). `config list` files the
+  `onboarding.{repos,knowledge,shell}.declined` keys under `onboarding`.
+- `setup probe` reports provenance `uninstalled` for a store `setup
+  uninstall` left behind.
+- `setup probe` reports each harness's own version in `harnesses[].version`,
+  read from its `--version`; it is null only when the harness's command is
+  not on your PATH or prints no version.
+
+### Removed
+
+- These verbs now answer `unknown_command`: `graph retag`, `graph slug`,
+  `item log-access`, `hook validate`, `memory eval`, `trace replay`,
+  `usage profile`, `setup profiler-env`, `db stats`, `db schema` and
+  `setup get-token`. Hook validation, the recall eval and trace replay are
+  developer tools in the source tree (`go run ./cmd/hook-validate --harness
+  claude|codex`, `./cmd/memory-eval`, `./cmd/trace-replay`). The updater
+  reads the GitHub token itself (`ANTON_GITHUB_TOKEN`, then `gh auth token`),
+  so it is never handed to the model.
+- `graph query` templates `cte`, `subclasses-of` and `renders-tree`, and the
+  `raw_cte_rejected` error kind. `transitive-walk --rel-types` walks the
+  inheritance and render relations.
+- `maintenance prune --target orphans` and `maintenance reindex --target
+  code` are refused (`bad_input`); `graph index` reindexes a repo's code.
+- `config set --if-equals`, and with it the `cas_mismatch` error kind; the
+  `conformance_failed` and `eval_failed` kinds went with `hook validate` and
+  `memory eval`.
+- The `--format` flag of `session get|list|stats|mark-reflected` and
+  `improvement list|approve|dismiss`, which every one of them ignored. Output
+  is always JSON, whatever the global `--format` says.
+- `graph query cycle-detect --max-seeds`: every strongly connected component
+  is reported.
+- Envelope fields nothing read: `fold_stray_types` and `repo_renamed_sweep` in
+  `maintenance run|consolidate|status`, `docs_cleaned` in `repos sync`,
+  `reflect_landed`, `pipeline_stages_skipped` and
+  `deep_analysis_dispatch_recommended` in `hook session-start`, the
+  `attribution` section of `usage stats`, `task_mult`/`tm=` in `memory recall
+  --explain`, and `legacy_core`, `skipped:windows` and the
+  `hook-bootstrapped` provenance, which no install could reach, in `setup
+  probe`.
+- Config keys nothing read: `maintenance.enabled`,
+  `maintenance.last_weekly`, `retrieval.contextTokenBudget`,
+  `session_intelligence.enabled`,
+  `session_intelligence.extract_failure_threshold`,
+  `task.priority_{high,medium,low}_mult`, `task.due_overdue_mult`,
+  `task.due_soon_mult`, `task.hide_completed`,
+  `freshness.{stable,moderate,volatile}_tier`, `co_accessed.expand_weight`,
+  `tools.expand_batch_cap`, `code_graph.dbc_*`, `code_graph.cycles_max_seeds`,
+  `ttl.step_log_days` and 35 unused `code_graph.*` keys. `config set` refuses
+  them; a value already stored is ignored with one warning.
+- The OTLP profiler and its settings.
+- Windows builds. anton-core runs on macOS and glibc Linux.
+- The `ANTON_UPDATE_API_BASE`, `ANTON_UPDATE_DOWNLOAD_BASE`,
+  `ANTON_COSIGN_IDENTITY_REGEXP` and `ANTON_COSIGN_ISSUER` overrides in release
+  binaries: an update always comes from GitHub and is verified against the
+  release identity.
+- Support for stores older than 4.0.0 (above), and the code that moved them
+  forward. The schema migrations up to 4.0.0 are one baseline per store.
+- The bulk-import checkpoint file. A re-run resumes through each file's
+  `source_sha256:` tag.
+- `compress exec` answers `unknown_command`, and Codex wrap mode is gone with
+  it. On Codex 0.167 the PreToolUse rewrite either skipped Codex's approval
+  prompt (beside `permissionDecision: allow`) or was ignored (without it), so
+  Codex output is no longer compressed. `compress doctor` drops `match.mode`;
+  `compress stats` still reports a stored `wrap` row as such. The smaller
+  Codex hook set moves recall-on-error's trust key, so a Codex install's
+  update to this release is held at rehearsal until `anton setup wire-harness
+  --harness codex` re-trusts it and `anton update prefetch --force` retries.
+
+
+### Fixed
+
+- `anton fragment apply` and `fragment status` from a Codex shell find the
+  installed plugin's fragment in Codex's plugin cache instead of failing with
+  `io_error` (the setup skill's Step 4b failed for every Codex user). With no
+  plugin root, as in a bare terminal, they and `system supply-chain` answer
+  `precondition_missing` and never read a file from the working directory; an
+  unreadable Codex `config.toml` is `io_error` naming it.
+- `anton fragment apply` no longer downgrades the routing fragment: a plugin
+  whose fragment is older than the pinned version, as one harness's stale
+  cache, leaves every instructions file and the pin as they are.
+- `repos remove` and `graph reset` count a store's code items: `code_items`
+  was always 0.
+- `graph query --repo`, `graph symbols --repo`, `watch`, `watch status` and
+  `dashboard` report `store_too_old` (or whatever stopped the store opening)
+  instead of asking for `CORE_DATA_DIR`. `graph query` and `graph symbols`
+  run outside a git checkout fail `precondition_missing` (exit 3) and point to
+  `--repo`, not `internal` (exit 5).
+- Items saved before the trigram index existed are indexed even when the
+  first upgrade's backfill failed or was interrupted: every later open retries
+  it until it completes.
+- `db check` and the health panel's `vec_orphan` count agree with
+  `maintenance repair --target invariants`.
+- When one item's chunk write fails during a save or bulk import, the other
+  items, derived decisions and action items included, are still written,
+  linked and embedded; the failure is reported and logged, and
+  `maintenance reindex` fills in the missing vectors.
+- `recall-on-error` reports a failed pattern read as a recall error, not "no
+  pattern". `repos doctor` fails when it cannot read the slug registry or
+  freshness rows, instead of reporting every repo inconsistent under `ok`.
+- `update rollback --restore-snapshot` refuses with `concurrent_modification`
+  (`quiesce_incomplete`) when it cannot read the run registry or a process
+  outlives SIGKILL; an unreadable snapshot directory is `internal`, not "no
+  snapshot".
+- The link and dream passes stop on a failed config read; a failed read of
+  `headless.enabled` no longer falls back to judging.
+- Setup no longer takes over a bootstrap lock whose pid file is still empty,
+  and bootstrap writes its pid atomically.
+- A pin naming a missing binary slot names `anton bootstrap --version` only
+  for a release this plugin pins a checksum for, and a bare `anton bootstrap`
+  otherwise.
+- A failed `session finalize` stage now keeps the session's marker for three
+  attempts instead of clearing it, writes a `FINALIZE_STAGE_FAILED` event, and
+  is listed by stage in the `finalize-backlog` health panel. A marker that
+  cannot be read is set aside into `pending-finalize/bad/` rather than
+  stopping the session-start sweep, and a marker's owner is checked by process
+  start time as well as pid, so a reused pid no longer passes for it.
+- A task due today no longer shows as overdue in the evening. `report summary`,
+  `task due`, `task groups`, the dashboard's tasks page and the session-start
+  briefing now read "today" from your local calendar, not UTC's, so west of
+  UTC a task due today stays due today until your own midnight.
+- `memory recall --limit` accepts 1 to 10000 on every route. A negative limit
+  crashed and `0` returned nothing; both are now clear errors, including
+  `--code --limit 0`, which used to return 20 results.
+- Recall returns the same results in the same order for the same inputs, a
+  repeated or padded `--tag` works, and a very large result pool no longer fails.
+- `update rollback` sticks: the version you left stays held until a newer
+  release ships or you run `update prefetch --force`.
+- A failed `item save`, `item import-native` or `item extract --backfill` names
+  the items it had already saved, in `error.written`. `item bulk-import` does the
+  same in each file's error.
+- A file that fails to index is retried on the next sync instead of being lost,
+  and a moved directory's files leave the index.
+- Indexing a large repository no longer blocks other writers for the whole
+  resolve. A run that follows a file edit on a repository with derived edges
+  still does, so that readers never see those edges missing.
+- A slow embedder download no longer stalls embedding.
+- `anton report health` no longer says a partly indexed file stays out of
+  the graph. The fix now says only the lines it left out stay out, or, when
+  nothing was left out, that the file stays indexed in segments.
+- A partly indexed file's fix in `anton report health` now reads "line 7",
+  not "lines 7", when a single line was left out.
+- The session summariser no longer pays again for a session it cannot
+  summarise. A call that trips the budget, or answers with no summary, is
+  recorded and never retried; a timeout or other passing failure still is.
+  `anton session summarize --force` tries again, and a failed attempt keeps any
+  summary you already have. Sessions that tripped before this change get one
+  more try, with the fitted transcript, the next time they finalize.
+- `anton session summarize` reports a failed call as an error (for example
+  `error:timeout`) rather than `skipped:not-wired`, which now means the engine
+  is absent.
+- Two simultaneous writes to the same file in one anton-core process no longer
+  fail with `file exists`.
+- A malformed compressed Codex session file can no longer crash anton-core
+  while it is read (GO-2026-6865, `klauspost/compress` v1.20.2).
+- Output compression leaves piped, chained, redirected and substituted
+  commands untouched, instead of compressing them as their first command.
+- A `go test` run with any `FAIL` line reaches the model in full.
+- `git log -p`, `--stat` and other flags outside the supported set pass
+  through instead of losing their patches and stats.
+- `git diff` summaries handle quoted non-ASCII paths, count content lines
+  starting with `---`/`+++`, and pass through on a header they cannot read,
+  such as `diff --cc`.
+- A line over 1 MiB makes compression pass the output through instead of
+  silently cutting it short.
+- `rg` searching a single path passes through, so no match is dropped.
+- A foreground dashboard exits when its launching session dies under a
+  subreaper, not only when it is handed to init.
+- Stopping the dashboard while a browser holds a preconnected socket exits
+  cleanly instead of failing with `context deadline exceeded`.
+- The task, session, improvement, memory-search and symbol-search lists say
+  "N of M" when there are more rows than shown, instead of presenting the
+  cap as the total.
+- A saved task shows in `task list` immediately.
+- Identical items in one extraction are written once.
+- A PDF import has a 60 s deadline and a 2,000-page cap, and refuses
+  page-tree cycles.
+- An Office import caps inflated bytes at 32 MiB per part and 64 MiB in
+  total.
+- One file's OCR failure no longer halts `item bulk-import`.
+- `item extract --backfill` refuses content-mode flags and reports failed
+  sessions (`sessions_failed`, `failures`).
+- Inline-extract failures and rejections become save warnings.
+- A cancelled `item bulk-import` in json or summary format emits its summary
+  with `interrupted` and `remaining`.
+- Import truncation is reported (`truncated`, `original_bytes`) and never
+  splits a character.
+- Two concurrent saves of one body write one item, and re-saving a known
+  body keeps the new title and tags.
+- `config set retrieval.freshnessExponent` refuses NaN, infinite and
+  negative values. A bad stored freshness, hop-decay or resolve-bonus value
+  falls back to its default with a warning instead of breaking recall.
+- `item list --limit` accepts 1 to 10000 and refuses anything else.
+- Code recall's search arms are bounded, so a common word no longer scans
+  the whole symbol table.
+- `cycles` all-mode finds every cycle, with no seed cap; `--max-seeds` and
+  `code_graph.cycles_max_seeds` are removed.
+- `graph query`: an unknown seed id is `entity_not_found`, an unknown rel
+  type is `invalid_argument`, and a JSON-array `--rel-types` is accepted.
+- `graph index` reports `attached` when another run held the lease, and
+  lists the files it newly quarantined.
+- Code-graph extraction honours the file's parse deadline and stops on
+  SIGINT or SIGTERM.
+- The stamped catch-up baseline is the HEAD read before listing files, so a
+  commit landing mid-run is not lost.
+- The index lease is refreshed on a timer, the closing stamp is fenced on
+  the lease, and a live run's in-flight markers are never consumed by
+  another run.
+- Crash quarantine backs off: a retry after 1 h, then after 1 d, and
+  permanent after the third consecutive death. The graph store schema moves
+  to v15, a rebuild from source.
+- Parses are admitted against a `code_graph.index_memory_limit_mb` memory
+  budget.
+- With `git` missing, a checkout is refused with `precondition_missing`; a
+  plain directory is indexed with a `not_a_git_repo` warning.
+- A worktree seed keeps the parent's dirty set, leaked `.seed.<pid>` temps
+  are reaped, and a seeder never replaces a store under a fresh lease.
+- An update or rollback killed partway resumes on the next update command,
+  keeping `previous` as the rollback target.
+- Leftover rehearsal temp directories are cleaned up at the start of every
+  update command.
+- When the GitHub API returns 403 or 429, the updater finds the latest
+  release through the web redirect. The token is read from
+  `ANTON_GITHUB_TOKEN`, then `GITHUB_TOKEN`, then `gh auth token`.
+- `apply-if-staged --budget` limits the whole call, including waiting for
+  the update lock.
+- The rehearsal health check no longer passes `--json`.
+- The Codex stray-group cleanup no longer removes a user's own `hooks.json`
+  group; it matches only anton's wrapper-script commands.
+- The hook wrapper reads the pinned version under POSIX `sh` (Alpine's
+  busybox ash).
+- The public-surface check refuses a shipped reference that climbs out of
+  the plugin tree.
+- A development build can no longer leave the release you have installed
+  locked out of your store. When it would raise the store's writer stamp, it
+  refuses to open the store with `schema_skew` and names
+  `ANTON_ALLOW_DEV_MIGRATE=1`, which lets it migrate anyway. A brand-new store
+  and release builds are unaffected.
+- `setup uninstall` removes everything setup wrote: the watch daemon's
+  supervisor unit (`daemon`, with the command that unloads one still
+  running), anton's region of Claude Code's instructions file
+  (`claude_settings.fragment`), the status-line wrapper, including one a
+  data-root move left under the old root, and the settings an earlier `setup
+  profiler-env` wrote. `--dry-run` lists exactly what a real run removes.
+- A Claude Code hook whose pinned binary is missing exits 0 with a warning on
+  stderr, instead of exit 2, which Claude Code reads as a block.
+- With `~/.codex` present but no anton-core plugin in Codex, setup leaves
+  Codex's instructions file and memory settings alone, and health reports the
+  plugin not installed. Naming it with `--harness` is `precondition_missing`.
+- The bootstrap lock is created with its pid already inside, and one left
+  with no pid for over 60 s is taken as stale.
+- A data-root move killed partway resumes at the next session start, and
+  resuming into a non-empty target merges with the move's conflict check.
+- A wait for another process's store initialisation gives up with
+  `db_locked` after 30 s, and stops on SIGINT or SIGTERM.
+- Past the kernel's inotify watch limit the watch daemon logs one message
+  naming `fs.inotify.max_user_watches`, and `watch status` and health report
+  it degraded; the catch-up sync still indexes the unwatched directories.
+- `watch install-daemon` on Linux without systemd refuses with
+  `precondition_missing` and names the route to take instead, rather than
+  writing a unit nothing loads.
+- On musl Linux the embedder downloads nothing and health reports the vector
+  arm unavailable; recall runs on full-text and graph.
+- `setup wire-harness` records the values it replaces before it commits, so
+  a crash between the two no longer leaves a re-run treating anton's values
+  as yours, and setup verbs no longer drop each other's keys in
+  `config.json` when they write at once.
+- `config set` refuses a key it does not know, and any value that is not
+  finite, is out of the key's range or enumeration, or is malformed JSON for
+  a JSON key (`invalid_argument`, nothing written).
+- `improvement list --since` accepts an ISO 8601 instant as well as epoch
+  milliseconds; an ISO value used to return nothing.
+- Dismissing an improvement no longer leaves an orphaned item behind.
+- The dream pass spends one `dream.max_budget_usd` across its judging and
+  theme synthesis, not one each. Link and dream skip their neighbour search
+  when no engine is bound.
+- Theme synthesis sends at most 40 members and 32 KiB per cluster, skips a
+  cluster an existing theme already covers, and replaces a superseded theme
+  in the same transaction that mints its successor.
+- A judged `supersedes` edge points the way the judge said, an edit to
+  either item reopens a pair judged unrelated (migration 0047), and the pair
+  bodies are fenced so their text cannot pass as instructions.
+- A relationship naming a title two items share binds to neither and waits
+  as a pending edge until the title is unambiguous.
+- A Codex headless run stops at its dollar cap, metered from the usage Codex
+  reports, and a spend cap of 0 or below is refused rather than read as no
+  cap.
+- `maintenance decay` honours `maintenance.stale_days`,
+  `maintenance.decay_factor` and `maintenance.edge_decay_factor` set with
+  `config set`.
+- The consolidation-stall health check reads each pass's full figures from
+  a table of their own (migration 0048), so seven-digit counters no longer
+  hide a stall.
+- `maintenance reindex` re-embeds the documents in every repo's store after
+  an embedder change, and resumes an interrupted re-embed where it stopped.
+- A model id the price table does not list, a new point release included,
+  is reported under `unpriced_models` instead of priced as its family.
+- A session that runs past midnight books each day's tokens on that day.
+- `report summary`'s `search_misses` counts only recalls that found nothing.
+- A code-graph store removal killed partway is finished by the next one, and
+  a scratch file a killed `db migrate` probe leaves is not counted as a
+  store.
+- A repo moved or deleted from a directory still on disk is counted by the
+  `graph_stores` health check and its store reaped by the daily prune, and
+  worktree stores past `code_graph.worktree_store_cap` are reaped least
+  recently used first.
+- A large TypeScript, Go or Python file indexes in time that grows with its
+  length, not its cube: a 4,000-statement file takes seconds.
+- Python method lookup follows the C3 resolution order, so a diamond
+  resolves to the class Python calls.
+- A call bound on its name alone is recorded `HEURISTIC`, not `EXTRACTED`.
+- PHP `foreach`, `catch` and destructuring and Ruby `attr_writer` and
+  subclass receivers are typed correctly, and C# `base.M()` binds to the base
+  class, never an interface.
+
+### Security
+
+- Built with Go 1.27.4 and current `golang.org/x/net`, `grpc` and
+  `sigstore-go`, which also drops the unmaintained `openpgp` package
+  (GO-2026-6859, -6617, -6612, -6611, -6603, -6348 and -5932).
+- `graph parse-reduce` no longer leaks your source text into the fragment
+  it writes. Interpolation holes in C#, JS/TS, Python and Ruby strings are
+  scrubbed like code, Go raw strings, regexes, Ruby word arrays, heredocs and
+  markdown fences are scrubbed whole, and digits on preprocessor lines are
+  replaced. A fragment that only stops the parser with some of your text put
+  back is refused with `leak_risk` (exit 1); `--accept-restored` writes it
+  anyway.
+- Your data folder and its databases are readable by you alone. A fresh
+  install creates them that way, and an install an older release left
+  readable by other users is tightened the next time anton opens it.
+- The command lines kept in the compression and error-recall logs have
+  passwords, tokens and keys masked, and are cut without splitting a
+  character.
+- The dashboard refuses requests addressed to a host name other than
+  localhost, so a web page using DNS rebinding can no longer read it. It
+  also refuses cross-site writes.
+- A PDF page whose content stream inflates past 64 MiB is refused before it
+  is decompressed into memory, and a timed-out PDF parse blocks further PDF
+  imports until it ends instead of piling up.
+- A symlink resolving outside the repo is never indexed, and a macOS repo
+  root resolves to its on-disk case, so one repo is one store.
+- Update signatures are verified inside the binary against Sigstore's public
+  trust root (release identity, issuer, push trigger, transparency log,
+  SCT). No `cosign` binary is needed, and an asset without a verifying
+  bundle is never staged.
+- The update endpoint and signing-identity environment overrides exist only
+  in test builds; release binaries ignore them.
+- Bootstrap verifies each download against the plugin's
+  `release-checksums.txt`, and refuses a download with no signature bundle
+  when cosign is installed.
+- A gitleaks pre-commit hook, pinned by SHA, refuses a staged secret.
+
 ## [4.1.2] - 2026-10-31
 
 ### Fixed
@@ -24,26 +531,6 @@ This file is the source of the notes published on each GitHub release.
   the update held itself back. That case now warns and names the fix, `anton
   setup wire-harness --harness codex`; anton-core still never re-trusts its
   hooks on its own.
-- A markdown file the parser stops on is now indexed `partial` instead of
-  quarantined whole: a bad inline span costs only its lines and a bad block
-  only that block. Files without a final newline index cleanly, and
-  `anton graph parse-reduce` shrinks markdown stops too.
-
-## [4.1.1] - 2026-10-31
-
-Not published: the release's upgrade check failed before publishing. Every change below ships in 4.1.2.
-
-### Fixed
-
-- anton-core's hooks run again under Codex 0.166 and later. Codex 0.166
-  changed how it records a trusted plugin hook, and setup's trust entries no
-  longer matched, so Codex skipped every anton-core hook. Run
-  `anton setup wire-harness --harness codex` once after upgrading; `anton
-  report health` says so when Codex's trust and anton-core's disagree.
-  After any plugin update, Codex 0.166 and later asks you to review
-  anton-core's hooks at startup: choose "Trust all", or run `anton setup
-  wire-harness --harness codex`. If you only run headless `codex exec`, run
-  wire-harness after updating.
 - A markdown file the parser stops on is now indexed `partial` instead of
   quarantined whole: a bad inline span costs only its lines and a bad block
   only that block. Files without a final newline index cleanly, and
@@ -685,7 +1172,8 @@ Not published: the release's upgrade check failed before publishing. Every chang
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.2...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v5.0.1...HEAD
+[5.0.1]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.2...v5.0.1
 [4.1.2]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.0...v4.1.2
 [4.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v3.1.0...v4.0.0

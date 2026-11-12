@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 # Plugin hook: SessionStart
+
+# Finish an interrupted data-root move first: mid-move the store's own binary
+# sits behind a link that dangles, so the wrapper could not resolve one. The
+# move copied itself to ~/.anton-core/.relocate (setup relocate-data-root) and
+# removes that copy once done; the log stays beside it while it fails.
+_resume="${HOME:-}/.anton-core/.relocate/anton-core"
+if [[ -n "${HOME:-}" && -x "$_resume" ]]; then
+    "$_resume" setup relocate-data-root >/dev/null 2>>"${_resume%/*}/resume.log" || true
+fi
+unset _resume
+
 # shellcheck source=lib/wrapper.sh disable=SC1091
 source "$(dirname "$0")/lib/wrapper.sh"
 
@@ -20,8 +31,7 @@ mkdir -p "$LOG_DIR" 2>/dev/null || true
 _pin_rc=0
 _resolve_pinned_bin "$CORE_DATA_DIR" || _pin_rc=$?
 if [[ $_pin_rc -ne 0 ]]; then
-    [[ -n "$_anton_harness_flag" && "$ANTON_HARNESS" == codex ]] && exit 0
-    exit 2
+    exit "$(_anton_pin_miss_status)"
 fi
 export ANTON_BIN
 

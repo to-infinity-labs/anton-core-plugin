@@ -1,0 +1,12 @@
+# Release binary checksums, every release from v4.1.2 on: <tag>  <sha256>  <asset>.
+# bootstrap-fetch checks a downloaded binary against this file as well as the
+# release's checksums.txt; a version missing here fails closed. Rows are only
+# ever added (sdlc release sync-public-surface), never edited or dropped.
+v4.1.2  6cef8338477701f0295814b92a3b22d079bed01d26b17f874dfa5c9410b94a48  anton-core-v4.1.2-darwin-amd64
+v4.1.2  53ef08c43fe2bbfbb49a78a7f460af314d6ed278c923ebe3dc909699860c4bc5  anton-core-v4.1.2-darwin-arm64
+v4.1.2  2309ee1f0604216c369fef333296fea2a95f33041fbcc949316ab77a67fc8e71  anton-core-v4.1.2-linux-amd64
+v4.1.2  1c217e64fc17150327295dfa5cf6fbb298ea47f81e27335c6a4b87130a9577d8  anton-core-v4.1.2-linux-arm64
+v5.0.1  995e6981633017bd3f399ac302c02fdcebaa152e02df9b34c777deeae268fd24  anton-core-v5.0.1-darwin-amd64
+v5.0.1  17f05715abc77705bcf067b3985ee47e7160d48d4a5706479a85fb748cdb3bbf  anton-core-v5.0.1-darwin-arm64
+v5.0.1  49f3c871e262c45d61a32ccd7ebd329d910fbb83674bf66ab34003f44b9721ed  anton-core-v5.0.1-linux-amd64
+v5.0.1  301f9193ea016d3fd33fd96f8aabd3c527912fce2b371373beed2101a16dd980  anton-core-v5.0.1-linux-arm64

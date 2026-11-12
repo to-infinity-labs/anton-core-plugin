@@ -10,14 +10,18 @@
 #
 # It fetches the matching per-platform release binary from the PUBLIC release
 # repo (unauthenticated HTTPS, per the public-distribution design), verifies it
-# (transport-integrity checksum always; supply-chain cosign opportunistically),
-# installs it into the pin layout at data/versions/v<ver>/anton-core, and writes
+# against the release's checksums.txt and the plugin tree's own
+# release-checksums.txt, and with cosign installed against its sigstore bundle,
+# installs it into the pin layout at data/versions/v<ver>/anton-core with its
+# sigstore bundle beside it (anton-core.sigstore.json), and writes
 # the staged-update.json prefetch record so setup's apply-if-staged can rotate
 # it to `current` and write the first pin (the only pin writer).
 #
 # Fetch transport is unauthenticated HTTPS (`curl -fsSL`) against the PUBLIC
 # release repo; no token / auth / URL-base / API-base env vars are consulted.
 # Assets are fetched by their stable releases/download/v<ver>/<asset> URLs.
+# `--from <dir>` reads the same assets from a local directory instead, for a
+# host that cannot reach GitHub; every check below still applies.
 #
 # Root resolution is wrapper.sh's _resolve_data_root, the chain the binary
 # itself walks, so the slot lands where every later call reads it.
@@ -29,6 +33,9 @@
 # Exit 0 on success (with a success line on stdout); non-zero on any failure
 # (with a machine-parseable reason on stderr).
 set -euo pipefail
+# The root holds the memory store, so nothing this script creates is readable
+# by other users.
+umask 077
 
 # ── Resolve the plugin and data roots ─────────────────────────────────────
 # Standalone, so the plugin root falls back to this script's own ../.. .
@@ -41,7 +48,10 @@ _repo_slug="to-infinity-labs/anton-core-plugin"
 
 _usage() {
     cat <<'USAGE'
-Usage: bootstrap-fetch.sh [--version vX.Y.Z]
+Usage: bootstrap-fetch.sh [--version vX.Y.Z] [--from DIR]
+
+--from DIR reads the release assets (the platform binary, checksums.txt and,
+when present, its .sigstore.json bundle) from DIR instead of GitHub.
 
 Fetches, verifies, and installs the anton-core binary into the pin layout
 (data/versions/v<ver>/anton-core) and writes staged-update.json. Setup-only;
@@ -102,6 +112,7 @@ fi
 
 # ── Argument parsing ──────────────────────────────────────────────────────
 _arg_version=""
+_arg_from=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --version=*) _arg_version="${1#*=}" ;;
@@ -110,6 +121,14 @@ while [[ $# -gt 0 ]]; do
                 _fail "bad_args" "--version requires a value (e.g. --version v1.2.3)"
             fi
             _arg_version="$2"
+            shift
+            ;;
+        --from=*) _arg_from="${1#*=}" ;;
+        --from)
+            if [[ $# -lt 2 ]]; then
+                _fail "bad_args" "--from requires a directory holding the release assets"
+            fi
+            _arg_from="$2"
             shift
             ;;
         -h|--help)
@@ -164,9 +183,13 @@ case "$_versions_root" in
         ;;
 esac
 
-# curl is required for the fetch — hard-fail early so the reason is precise.
-command -v curl >/dev/null 2>&1 || _fail "curl_not_installed" \
-    "curl not found on \$PATH; install curl to fetch the release binary"
+if [[ -n "$_arg_from" ]]; then
+    [[ -d "$_arg_from" ]] || _fail "from_not_a_directory" "--from ${_arg_from} is not a directory"
+else
+    # curl is required for the fetch — hard-fail early so the reason is precise.
+    command -v curl >/dev/null 2>&1 || _fail "curl_not_installed" \
+        "curl not found on \$PATH; install curl to fetch the release binary"
+fi
 
 dest_dir="${_versions_root}/v${ver}"
 dest="${dest_dir}/anton-core"
@@ -180,6 +203,13 @@ state_dir="${_data_root}/data/state"
 # reclaim is PID-fenced: a waiter that finds a dead holder races to atomically
 # rename the lockdir aside; exactly one waiter wins the rename and cleans up.
 mkdir -p "${_data_root}/data"
+# mkdir -p leaves an existing directory's mode alone, and an older install
+# created the root 0755.
+for _d in "$_data_root" "${_data_root}/data"; do
+    if [[ -O "$_d" ]]; then
+        chmod 700 "$_d" || _fail "chmod_failed" "could not restrict ${_d} to its owner (0700)"
+    fi
+done
 _lock_target="${_data_root}/data/.bootstrap-fetch.lock"
 _lock_attempt=0
 while true; do
@@ -191,7 +221,10 @@ while true; do
     fi
     if mkdir "$_lock_target" 2>/dev/null; then
         _lock_dir="$_lock_target"
-        echo "$$" > "$_lock_dir/pid"
+        # Renamed into place: a waiter that read a half-written pid file would
+        # take the lock for dead.
+        echo "$$" > "$_lock_dir/pid.$$"
+        mv "$_lock_dir/pid.$$" "$_lock_dir/pid"
         # Post-acquire re-check: a peer could have installed between the
         # pre-check and this mkdir.
         if [[ -x "$dest" ]]; then
@@ -236,9 +269,18 @@ base_url="https://github.com/${_repo_slug}/releases/download/v${ver}"
 # abort the script before the assignment.
 dl_err="${_tmpdir}/curl-download.err"
 dl_rc=0
-curl -fsSL -o "$bin_tmp" "${base_url}/${binary_name}" 2>"$dl_err" || dl_rc=$?
-if [[ $dl_rc -eq 0 ]]; then
-    curl -fsSL -o "$checksums_tmp" "${base_url}/checksums.txt" 2>>"$dl_err" || dl_rc=$?
+if [[ -n "$_arg_from" ]]; then
+    for _asset in "$binary_name" checksums.txt; do
+        [[ -f "${_arg_from}/${_asset}" ]] || _fail "from_asset_missing" \
+            "${_arg_from} has no ${_asset}; --from needs the platform binary and checksums.txt from the v${ver} release"
+    done
+    cp "${_arg_from}/${binary_name}" "$bin_tmp" || _fail "from_copy_failed" "could not copy ${_arg_from}/${binary_name}"
+    cp "${_arg_from}/checksums.txt" "$checksums_tmp" || _fail "from_copy_failed" "could not copy ${_arg_from}/checksums.txt"
+else
+    curl -fsSL -o "$bin_tmp" "${base_url}/${binary_name}" 2>"$dl_err" || dl_rc=$?
+    if [[ $dl_rc -eq 0 ]]; then
+        curl -fsSL -o "$checksums_tmp" "${base_url}/checksums.txt" 2>>"$dl_err" || dl_rc=$?
+    fi
 fi
 if [[ $dl_rc -ne 0 ]]; then
     dl_msg=""
@@ -269,18 +311,51 @@ if [[ "$expected_sha" != "$actual_sha" ]]; then
         "checksum mismatch for ${binary_name}: expected ${expected_sha}, got ${actual_sha}"
 fi
 
-# ── Cosign verify (supply-chain, opportunistic) ───────────────────────────
-# cosign absent, or the sigstore bundle 404s → checksum-only integrity, proceed
-# (per the public-distribution verification design). cosign present AND it
-# REJECTS → hard-fail.
+# ── Pinned checksum (the plugin tree's own record) ────────────────────────
+# checksums.txt arrives with the release, so whoever can replace a release
+# asset can replace it too. release-checksums.txt ships in the plugin tree and
+# carries `v<ver>  <sha256>  <asset>` for every release from v4.1.2 on, so
+# --version of a past release is pinned as well. No row is a refusal.
+pinned_file="${ANTON_PLUGIN_ROOT}/release-checksums.txt"
+[[ -r "$pinned_file" ]] || _fail "pinned_checksums_unreadable" \
+    "${pinned_file} is missing or unreadable; the plugin tree pins every release's checksum there"
+pinned_sha="$(awk -v tag="v${ver}" -v name="$binary_name" '$1 !~ /^#/ && $1 == tag && $3 == name { print $2; exit }' "$pinned_file")"
+if [[ -z "$pinned_sha" ]]; then
+    _fail "pinned_checksum_missing" \
+        "${pinned_file} has no v${ver} row for ${binary_name}; this plugin tree does not vouch for that release"
+fi
+if [[ "$pinned_sha" != "$actual_sha" ]]; then
+    _fail "pinned_checksum_mismatch" \
+        "${binary_name} is ${actual_sha} but ${pinned_file} pins ${pinned_sha}"
+fi
+
+# ── Sigstore bundle ───────────────────────────────────────────────────────
+# Kept beside the installed binary: apply-if-staged verifies it in-process
+# before rotating a bootstrap record in, so a release without one installs
+# here but is refused there. A separate curl call, so a 404 does not sink the
+# required binary/checksums fetch above.
+bundle_fetched="false"
+if [[ -n "$_arg_from" ]]; then
+    if [[ -f "${_arg_from}/${binary_name}.sigstore.json" ]]; then
+        cp "${_arg_from}/${binary_name}.sigstore.json" "$bundle_tmp" || _fail "from_copy_failed" \
+            "could not copy ${_arg_from}/${binary_name}.sigstore.json"
+        bundle_fetched="true"
+    fi
+elif curl -fsSL -o "$bundle_tmp" "${base_url}/${binary_name}.sigstore.json" 2>/dev/null; then
+    bundle_fetched="true"
+fi
+if [[ "$bundle_fetched" != "true" ]]; then
+    printf 'bootstrap-fetch: no sigstore bundle for %s; apply-if-staged will refuse it\n' "$binary_name" >&2
+fi
+
+# ── Cosign verify ─────────────────────────────────────────────────────────
+# cosign absent → the pinned checksum is the integrity check, proceed. cosign
+# present → the bundle must exist and verify.
 cosign_verified="false"
 if command -v cosign >/dev/null 2>&1; then
-    # Best-effort bundle fetch. MUST be a separate curl call: a release missing
-    # the sigstore bundle should skip supply-chain verification, not sink the
-    # whole fetch — so a 404 here is tolerated (warn + proceed), whereas the
-    # required binary/checksums fetch above hard-fails.
-    if ! curl -fsSL -o "$bundle_tmp" "${base_url}/${binary_name}.sigstore.json" 2>/dev/null; then
-        printf 'bootstrap-fetch: cosign installed but bundle fetch failed; skipping supply-chain verification\n' >&2
+    if [[ "$bundle_fetched" != "true" ]]; then
+        _fail "bundle_missing" \
+            "cosign is installed but ${binary_name}.sigstore.json could not be fetched — refusing an unverifiable install"
     elif cosign verify-blob \
             --certificate-identity-regexp '^https://github\.com/to-infinity-labs/anton-core-go/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$' \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
@@ -304,6 +379,11 @@ if ! mv_err="$(mv "$bin_tmp" "$dest" 2>&1)"; then
     _fail "install_failed" \
         "failed to move the binary into place at ${dest}: ${mv_err:-unknown error}"
 fi
+if [[ "$bundle_fetched" == "true" ]] && ! mv_err="$(mv "$bundle_tmp" "${dest}.sigstore.json" 2>&1)"; then
+    rm -f "$dest"
+    _fail "install_failed" \
+        "failed to move the sigstore bundle into place at ${dest}.sigstore.json: ${mv_err:-unknown error}; slot cleared"
+fi
 
 # ── Exec sanity probe (unwind on fail) ────────────────────────────────────
 # A checksum-valid but unusable artifact (corrupt bytes, glibc-version mismatch,
@@ -325,12 +405,16 @@ fi
 # This is "the prefetch layout — one staging contract": the exact JSON keys of
 # the Go staged-update record. binary_path is RELATIVE to the data dir (matches
 # the Go prefetch writer); target_version + binary_path are load-bearing
-# (apply-if-staged + wrapper.sh read them). Setup then rotates it in.
+# (apply-if-staged + wrapper.sh read them). explicit_version marks an operator's
+# --version, which apply-if-staged installs even when it is not newer than the
+# pin. Setup then rotates it in.
+explicit_version="false"
+[[ -n "$_arg_version" ]] && explicit_version="true"
 mkdir -p "$state_dir"
 _now_ms=$(( $(date +%s 2>/dev/null || echo 0) * 1000 ))
 staged_tmp="${state_dir}/.staged-update.json.tmp.$$"
-printf '{"target_version":"v%s","source_release_url":"https://github.com/%s/releases/tag/v%s","binary_path":"data/versions/v%s/anton-core","fetched_from":"bootstrap","fetched_at":%s,"checksum_verified":true,"cosign_verified":%s}\n' \
-    "$ver" "$_repo_slug" "$ver" "$ver" "$_now_ms" "$cosign_verified" > "$staged_tmp"
+printf '{"target_version":"v%s","source_release_url":"https://github.com/%s/releases/tag/v%s","binary_path":"data/versions/v%s/anton-core","fetched_from":"bootstrap","fetched_at":%s,"checksum_verified":true,"cosign_verified":%s,"explicit_version":%s}\n' \
+    "$ver" "$_repo_slug" "$ver" "$ver" "$_now_ms" "$cosign_verified" "$explicit_version" > "$staged_tmp"
 chmod 600 "$staged_tmp"
 if ! mv "$staged_tmp" "${state_dir}/staged-update.json" 2>/dev/null; then
     rm -f "$staged_tmp" 2>/dev/null || true

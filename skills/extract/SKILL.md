@@ -1,27 +1,33 @@
 ---
 name: extract
-description: Pulls action items, decisions, key points, and open questions out of unstructured content. Use for turning a transcript or notes into structured items, and gestures like 'extract tasks' or 'what did we decide'.
+description: Pulls action items, decisions, key points and open questions out of meeting notes, a transcript or a document. Use for 'pull the action items out of these notes', 'what did we decide' or 'extract tasks from this'.
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Analyses content — pasted text, file path, or content already saved by another skill — and emits a structured envelope of action items, decisions, key points, and open questions. Operates in two modes: a standalone interactive surface, and a silent pipeline stage chained from `save`.
+Reads unstructured content and returns its action items, decisions, key points and open questions. Each action item is marked for whether it belongs to the operator.
 
 ## When to use
 
-- "extract tasks from this", "what action items are here", "pull out facts"
-- "what did we decide", "what are the key points"
-- Standalone review of a transcript, meeting notes, or pasted document
+- "pull the action items out of these notes", "extract tasks from this"
+- "what did we decide", "what are the key points", "what are my to-dos from this meeting"
+- A transcript, meeting notes or a pasted document to turn into structured items
 
 ## How
 
+Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
+
 ```
-anton item extract [--source-path <file>] [--source-ref <ref>] [--operator <name>] [--tasks-only] [--pipeline] [--metadata-only] [--output json|yaml]
+anton item extract [--source-path <file>] [--operator <name>] [--tasks-only]
 ```
 
-Standalone mode reads from `--source-path` (or stdin) and emits the structured envelope. Pipeline mode (`--pipeline`) emits the relationships array so downstream stages of an intake chain can consume them silently. `--tasks-only` returns `actionItems` alone. `--operator` overrides the configured owner for the action-item filter.
+Pasted content goes on stdin (`printf '%s' "<text>" | anton item extract`); a file goes in `--source-path`. `--operator` overrides the configured owner; `--tasks-only` returns the action items alone.
+
+Meeting tasks are owner-only: create a task (the [tasks](../tasks/SKILL.md) skill) only for an action item marked `createTask: true`, which is the operator's own. Never create one for another attendee's item; list those for the operator instead. Decisions worth keeping go through [save](../save/SKILL.md).
 
 ## Output
 
-Success envelope carries `sourceRef`, `actionItems`, `decisions`, `keyPoints`, `openQuestions`, and (under `--pipeline`) `relationships`. The owner filter marks each action item with `createTask: true` or `false` based on assignee. When the extractor is unavailable the verb still exits 0, with `extraction: "unavailable"`, a `reason` and an empty `actionItems`; report that extraction did not run rather than that the content held no items. `item extract` returns `{"status":"ok","mode":"content","sourceRef":"...","actionItems":[{"description":"...","createTask":<true|false>}],"decisions":[...],"keyPoints":[...],"openQuestions":[...]}`. Contract: `item-extract` in the anton-core CLI contract.
+`actionItems` (each with `description` and `createTask`), `decisions`, `keyPoints` and `openQuestions`. `extraction: "unavailable"` with a `reason` means the extractor did not run: report that, never that the content held no items.
+
+Contract: `item-extract` in the anton-core CLI contract.

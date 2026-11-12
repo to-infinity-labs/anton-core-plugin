@@ -1,23 +1,25 @@
 ---
 name: share
-description: Packages the current conversation work into a self-contained markdown document, saved to disk and copied to clipboard. Use for "share this", "make this portable", or "package this up".
+description: Packages this conversation's work into one self-contained markdown document, saved and copied to the clipboard. Use for 'share this', 'make this portable', 'write this up for someone' or 'package this up'.
 allowed-tools: Read, Write, Bash
 ---
 
 ## What it does
 
-Packages whatever the operator and assistant have been working on in the current conversation into a single self-contained markdown document — readable by anyone without access to this project, this database, or any prior context. Writes the file under the operator's shared-docs directory and copies the contents to the system clipboard.
+Writes what this conversation produced — files changed, decisions, commands, gotchas, configuration — as one markdown document a reader with no access to this project can follow, then copies it to the clipboard.
 
 ## When to use
 
-- "share this", "make this portable", "package this up"
-- `share <description>` with a 2-4 word slug of what to package
-- When the assistant notices itself hand-crafting a portable document — stripping internal references, copying file contents verbatim, writing a self-contained intro — proactively suggest this skill rather than continue ad-hoc
+- "share this", "make this portable", "package this up", "write this up for someone"
+- When you find yourself hand-writing a portable summary, suggest this skill instead
 
 ## Behavior
 
-This skill is prompt-only: no `anton` verb backs it. Follow the steps below.
+Prompt-only: no `anton` verb backs it.
 
-The skill scans the live conversation for files created or modified, decisions made, commands run, gotchas surfaced, and configuration in play; picks 3–5 sections from a fixed pool (Overview, Setup Prompt, Config Files, Process / Steps, Findings, Decisions, Gotchas, Customization) by relevance; writes a self-contained markdown document under `~/.anton-core/data/docs/shared/<YYYY-MM-DD>-<slug>.md` with file contents verbatim in fenced code blocks; and copies the file to the system clipboard via the platform-specific adapter (`pbcopy` / `clip.exe` / `xclip`). `--dry-run` previews in chat first; `--no-clipboard` skips the clipboard copy.
+1. Scan the conversation for files created or changed, decisions, commands run, gotchas and configuration in play.
+2. Pick the 3–5 sections that apply from Overview, Setup, Config Files, Steps, Findings, Decisions, Gotchas, Customization. Quote file contents verbatim in fenced blocks; drop internal ids and paths a reader cannot open.
+3. Write it to `<data root>/data/docs/shared/<YYYY-MM-DD>-<slug>.md`, where the data root is the `root` of the `data_root` check in `anton report health --full` (`~/.anton-core` unless it was moved), and today's date comes from the environment.
+4. Copy it to the clipboard with `pbcopy` (macOS), `wl-copy` or `xclip -selection clipboard` (Linux); with none present, say so and give the path.
 
-Write the shortest document that carries the decisions: state each fact once.
+Show the draft in chat first when the operator asks for a preview. Write the shortest document that carries the decisions: state each fact once.

@@ -1,35 +1,37 @@
 ---
 name: sessions
-description: Browses past harness session stats, history, and applied improvements. Use for "session stats", "how did my sessions go", or "what skills did I use". Pairs with `improvements` (action queue).
+description: Reviews how past coding sessions went — counts, durations, tools used, flags, tokens. Use for 'how did my coding sessions go this week', 'session stats', 'session history' or 'what tools did I use'.
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Read-only browser over the session-intelligence sidecar populated by the `SessionEnd` hook. Surfaces a thirty-day stats roll-up, a paginated recent-session list, per-session detail, and the historical applied-improvement log so the operator can audit how recent sessions have spent tools, time, and tokens.
+Read-only view of what the session-end pass recorded about each session: a rollup over N days, a recent list, one session's detail, and the log of improvements already applied.
 
 ## When to use
 
-- "session stats", "how did my sessions go", "session history"
-- "what skills did I use", `sessions`
-- Auditing recent session activity, flag counts, or tool-usage histograms
+- "how did my sessions go this week", "session stats", "session history"
+- "what tools did I use", "which sessions were flagged", "show me session <id>"
 
 ## How
 
+Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
+
 ```
-anton session list [--since <epoch-ms>] [--limit N]
+anton session stats [--days N] [--harness claude|codex]
+anton session list [--since <epoch-ms>] [--limit N] [--harness claude|codex]
 anton session get --session-id <session-id>
-anton session stats [--days N]
-anton session mark-reflected --session-id <session-id>
 anton improvement list --applied-only [--limit N]
 ```
 
-`--since` is an epoch-ms Int64 floor on `started_at`, not a date string. Default invocation shells `session stats --days 30` together with `session list --limit 10` and renders both blocks. `--improvements` switches to the applied-only counterpart via `anton improvement list --applied-only --limit 20`; pending review flows through the [improvements](../improvements/SKILL.md) skill.
+By default run `session stats --days 30` and `session list --limit 10` together; "this week" is `--days 7`. `--since` is epoch milliseconds, not a date.
 
 ## Output
 
-Per-verb envelopes: `session list` returns `{"status":"ok","count":N,"sessions":[{"harness":"claude","session_id":"...","headline":"...","started_at":<epoch-ms>,"duration_minutes":N,...}]}`, where each row carries `has_flags:1` only when the session raised flags — the field is omitted when it would be `0`; `session stats` returns `{"status":"ok","harness":"all","period_days":N,"sessions":N,"avg_duration_minutes":N,"avg_messages":N,"flagged_sessions":N,"top_tools":{...},"improvements":N,"token_total":N}` — `token_total` sums each session's main-transcript token buckets (input + output + cache read + cache creation; subagent spend lives in the token-usage ledger, surfaced by [usage](../usage/SKILL.md)); `session get` returns `{"status":"ok","session":{"harness":"claude","session_id":"...","started_at":<epoch-ms>,...}}`; `session mark-reflected` stamps `reflected_at` on the matching row and returns `{"status":"ok","session":{"id":"...","reflected_at":<epoch-ms>}}`; `improvement list --applied-only` returns `{"status":"ok","improvements":[...],"count":N}`. `--harness claude|codex` narrows list, get and stats to one harness (default `all`). Contract: `session-list` in the anton-core CLI contract.
+`session stats` gives the session count, average duration and messages, flagged sessions, the top tools and `token_total` — main-transcript tokens only; subagent spend is in the [usage](../usage/SKILL.md) ledger. A list row carries `has_flags: 1` only when the session raised flags.
+
+Contract: `session-stats`, `session-list`, `session-get`, `improvement-list` in the anton-core CLI contract.
 
 ## See also
 
-- [`improvements`](../improvements/SKILL.md) — action queue for the deep-analysis suggestions surfaced here; `sessions` is the read-only audit.
+- [`improvements`](../improvements/SKILL.md) — acts on the suggestions those sessions produced.

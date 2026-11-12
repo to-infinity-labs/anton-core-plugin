@@ -51,8 +51,8 @@ _script_dir="$(cd "$(dirname "$_script_path")" && pwd)"
 _anton_self_root="$(cd "$_script_dir/.." && pwd)"
 
 # --wrapper-check: operator probe. Resolves and prints the paths without
-# invoking the binary. JSON via jq when available; sed-escape fallback
-# otherwise so the diagnostic survives backslashes or doublequotes.
+# invoking the binary. JSON by printf with `\` and `"` escaped, so it works on
+# a jq-less host.
 if [[ "${1:-}" == "--wrapper-check" ]]; then
     # Parse-check the sourced wrapper before sourcing it: a bash 4-only
     # construct would otherwise explode on the next `core <verb>` while this
@@ -109,7 +109,7 @@ if [[ "${1:-}" == "--wrapper-check" ]]; then
     else
         dev_bin_exists=false
     fi
-    # The sed fallback escapes only `\` and `"`; a control byte (legal in POSIX
+    # The printer escapes only `\` and `"`; a control byte (legal in POSIX
     # paths) would emit invalid JSON, so refuse it.
     case "$ANTON_PLUGIN_ROOT$_anton_root$bin_path$dev_bin$version" in
         *[[:cntrl:]]*)
@@ -117,34 +117,19 @@ if [[ "${1:-}" == "--wrapper-check" ]]; then
             exit 2
             ;;
     esac
-    if command -v jq >/dev/null 2>&1; then
-        jq -nc \
-            --arg pr  "$ANTON_PLUGIN_ROOT" \
-            --arg pd  "$_anton_root" \
-            --arg drs "$_anton_root_src" \
-            --arg v   "$version" \
-            --arg bp  "$bin_path" \
-            --argjson be "$bin_exists" \
-            --argjson bmc "$bin_in_managed_cache" \
-            --arg db  "$dev_bin" \
-            --argjson dbe "$dev_bin_exists" \
-            --argjson wp "$wrapper_parses" \
-            '{plugin_root:$pr, plugin_data:$pd, data_root:$pd, data_root_source:$drs, version:$v, bin:$bp, bin_exists:$be, bin_in_managed_cache:$bmc, dev_bin:$db, dev_bin_exists:$dbe, wrapper_parses:$wp}'
-    else
-        _esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
-        printf '{"plugin_root":"%s","plugin_data":"%s","data_root":"%s","data_root_source":"%s","version":"%s","bin":"%s","bin_exists":%s,"bin_in_managed_cache":%s,"dev_bin":"%s","dev_bin_exists":%s,"wrapper_parses":%s}\n' \
-            "$(_esc "$ANTON_PLUGIN_ROOT")" \
-            "$(_esc "$_anton_root")" \
-            "$(_esc "$_anton_root")" \
-            "$(_esc "$_anton_root_src")" \
-            "$(_esc "$version")" \
-            "$(_esc "$bin_path")" \
-            "$bin_exists" \
-            "$bin_in_managed_cache" \
-            "$(_esc "$dev_bin")" \
-            "$dev_bin_exists" \
-            "$wrapper_parses"
-    fi
+    _esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
+    printf '{"plugin_root":"%s","plugin_data":"%s","data_root":"%s","data_root_source":"%s","version":"%s","bin":"%s","bin_exists":%s,"bin_in_managed_cache":%s,"dev_bin":"%s","dev_bin_exists":%s,"wrapper_parses":%s}\n' \
+        "$(_esc "$ANTON_PLUGIN_ROOT")" \
+        "$(_esc "$_anton_root")" \
+        "$(_esc "$_anton_root")" \
+        "$(_esc "$_anton_root_src")" \
+        "$(_esc "$version")" \
+        "$(_esc "$bin_path")" \
+        "$bin_exists" \
+        "$bin_in_managed_cache" \
+        "$(_esc "$dev_bin")" \
+        "$dev_bin_exists" \
+        "$wrapper_parses"
     exit 0
 fi
 

@@ -7,12 +7,12 @@ set -euo pipefail
 # _json_field <key> <file> — the string value of <key> in a JSON file, empty on
 # any miss. jq preferred; the grep fallback keeps a jq-less host working.
 _json_field() {
-    [[ -f "$2" ]] || return 0
+    [ -f "$2" ] || return 0
     if command -v jq >/dev/null 2>&1; then
         jq -r --arg k "$1" '.[$k] // empty' "$2" 2>/dev/null || true
     else
         grep -E "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" "$2" 2>/dev/null \
-            | head -1 \
+            | sed -n 1p \
             | sed -E "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"([^\"]+)\".*/\1/" \
             || true
     fi
@@ -77,26 +77,37 @@ _resolve_data_root() {
 # exactly the drift the pin exists to prevent. A dev-mode root is the cwd,
 # which a hook can fire in any checkout of, so only the plugin's own dev build
 # is ever executed for it — never a pin or staged slot found under ./data.
+# _anton_pin_ver records the pin's version, empty when no pin chose the binary.
+#
+# POSIX sh only: Alpine runs the hooks under busybox ash, which has no `$(<file)`.
 _resolve_pinned_bin() {
-    local root="$1" ver staged
-    ANTON_BIN=""
-    if [[ "${_anton_root_src:-}" == dev_mode ]]; then
-        [[ -x "$ANTON_PLUGIN_ROOT/bin/anton-core" ]] && ANTON_BIN="$ANTON_PLUGIN_ROOT/bin/anton-core"
+    local root="$1" ver="" staged
+    ANTON_BIN="" _anton_pin_ver=""
+    if [ "${_anton_root_src:-}" = dev_mode ]; then
+        if [ -x "$ANTON_PLUGIN_ROOT/bin/anton-core" ]; then ANTON_BIN="$ANTON_PLUGIN_ROOT/bin/anton-core"; fi
         return 0
     fi
-    if [[ -f "$root/data/state/installed-version" ]]; then
-        ver="$(<"$root/data/state/installed-version")"
+    if [ -f "$root/data/state/installed-version" ]; then
+        # read fails on a final line with no newline but still sets ver.
+        IFS= read -r ver <"$root/data/state/installed-version" || true
         ver="${ver#v}"
-        ver="${ver//$'\n'/}"
+        _anton_pin_ver="$ver"
         ANTON_BIN="$root/data/versions/v${ver}/anton-core"
-        [[ -x "$ANTON_BIN" ]] && return 0
+        if [ -x "$ANTON_BIN" ]; then return 0; fi
         # The remedy must not pass this gate: the anton launcher runs
-        # `bootstrap` before scripts/core sources this file.
-        printf '⚠ pin names a missing binary slot v%s; restore it with: anton bootstrap --version v%s\n' "$ver" "$ver" >&2
+        # `bootstrap` before scripts/core sources this file. bootstrap refuses
+        # a --version with no release-checksums.txt row; a bare one installs
+        # this tree's own release.
+        local remedy="anton bootstrap"
+        if awk -v tag="v${ver}" '$1 == tag { found = 1; exit } END { exit !found }' \
+            "$ANTON_PLUGIN_ROOT/release-checksums.txt" 2>/dev/null; then
+            remedy="anton bootstrap --version v${ver}"
+        fi
+        printf '⚠ pin names a missing binary slot v%s; restore it with: %s\n' "$ver" "$remedy" >&2
         printf '{"status":"error","error":{"kind":"internal","reason":"pin_drift_fatal","pinned_version":"v%s"}}\n' "$ver" >&2
         return 2
     fi
-    if [[ -x "$ANTON_PLUGIN_ROOT/bin/anton-core" ]]; then
+    if [ -x "$ANTON_PLUGIN_ROOT/bin/anton-core" ]; then
         ANTON_BIN="$ANTON_PLUGIN_ROOT/bin/anton-core"
         return 0
     fi
@@ -104,10 +115,22 @@ _resolve_pinned_bin() {
     staged="$(_json_field binary_path "$root/data/state/staged-update.json")"
     case "$staged" in
         "") ;;
-        /*) [[ -x "$staged" ]] && ANTON_BIN="$staged" ;;
-        *) [[ -x "$root/$staged" ]] && ANTON_BIN="$root/$staged" ;;
+        /*) if [ -x "$staged" ]; then ANTON_BIN="$staged"; fi ;;
+        *) if [ -x "$root/$staged" ]; then ANTON_BIN="$root/$staged"; fi ;;
     esac
     return 0
+}
+
+# _anton_pin_miss_status — the exit status after _resolve_pinned_bin fails,
+# its warning already on stderr: 0 for a harness hook, since Claude Code reads
+# exit 2 as a block (a lost prompt, a refused edit) and Codex any non-zero as a
+# failed hook; 2 for a command.
+_anton_pin_miss_status() {
+    if [[ -n "$_anton_harness_flag" || "$ANTON_HARNESS" == claude ]]; then
+        echo 0
+    else
+        echo 2
+    fi
 }
 
 # ANTON_HARNESS: the hook runner's --harness, else the harness whose session
@@ -159,9 +182,7 @@ if [[ -n "$_anton_root" ]]; then
         # scripts/core captures this file's stderr; an exit here would end it
         # with the message still in the capture file.
         [[ -n "${ANTON_DEFER_BOOTSTRAP_ERROR:-}" ]] && return 2
-        # Codex reads a non-zero hook exit as a failed hook.
-        [[ -n "$_anton_harness_flag" && "$ANTON_HARNESS" == codex ]] && exit 0
-        exit 2
+        exit "$(_anton_pin_miss_status)"
     fi
 fi
 export ANTON_BIN
@@ -212,26 +233,60 @@ _anton_payload_field() {
     else
         printf '%s' "$_anton_payload" \
             | grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
-            | head -1 \
+            | sed -n 1p \
             | sed -E 's/.*:[[:space:]]*"([^"]*)"$/\1/' \
             || true
     fi
 }
 
+# _anton_pin_predates_v4 — whether the pin names a release before 4.0.0, whose
+# hook verbs reject --harness and read the payload's ids only from the flags.
+_anton_pin_predates_v4() {
+    local major="${_anton_pin_ver:-}"
+    major="${major%%.*}"
+    [[ "$major" =~ ^[0-9]+$ ]] && ((major < 4))
+}
+
+# The route out of store_too_old: this release reads stores from 4.0.0 on.
+# shellcheck disable=SC2016  # the backticks are Markdown for the message, not a substitution
+_anton_store_too_old_msg='{"systemMessage":"Anton Core is paused: this memory store predates 4.0.0, and this release reads stores from 4.0.0 on. Run `anton bootstrap --version v4.1.2`, start a new session so 4.1.2 migrates the store, then update."}'
+
 # hook_exec_fail_open <verb> [args…] — run the engine subcommand and ALWAYS
-# exit 0, forwarding its stdout only on a zero exit. Generalizes the guarded
-# invocation hotfix v2.2.1 applied to pre-tool-use.sh: a pinned binary that
+# exit 0, forwarding its stdout only on a zero exit. A pinned binary that
 # predates <verb> returns unknown-command/exit 2, a crash returns nonzero;
 # either way the wrapper forwards nothing and exits 0, so Claude Code never
-# reads the failure as a PreToolUse deny or a blocked UserPromptSubmit. Under
-# `set -e` the command-substitution failure is caught by the `if`, not fatal.
+# reads the failure as a PreToolUse deny or a blocked UserPromptSubmit.
 # Buffering stdout is safe: hook outputs are small (advisory context / a
 # protocol object). stdin passes through the substitution to the verb (the
-# post-tool-use payload path).
+# post-tool-use payload path). A store_too_old refusal is the one failure
+# SessionStart names, with the route out; stderr is buffered to spot it.
 hook_exec_fail_open() {
-    local out
-    if out="$("$ANTON_BIN" hook "$@")"; then
+    local out rc=0 errf arg skip="" kept=()
+    if _anton_pin_predates_v4; then
+        for arg in "$@"; do
+            if [[ -n "$skip" ]]; then
+                skip=""
+                continue
+            fi
+            case "$arg" in
+                --harness) skip=1 ;;
+                --harness=*) ;;
+                *) kept+=("$arg") ;;
+            esac
+        done
+        # An empty array under `set -u` dies in /bin/bash 3.2.
+        set -- ${kept[@]+"${kept[@]}"}
+    fi
+    errf="$(mktemp "${TMPDIR:-/tmp}/anton-hook.XXXXXX" 2>/dev/null)" || errf=/dev/null
+    out="$("$ANTON_BIN" hook "$@" 2>"$errf")" || rc=$?
+    if [[ $rc -eq 0 ]]; then
         printf '%s' "$out"
+    elif [[ $rc -eq 3 && "$1" == session-start ]] && grep -q '"kind":"store_too_old"' "$errf" 2>/dev/null; then
+        printf '%s\n' "$_anton_store_too_old_msg"
+    fi
+    if [[ "$errf" != /dev/null ]]; then
+        cat "$errf" >&2
+        rm -f "$errf"
     fi
     exit 0
 }

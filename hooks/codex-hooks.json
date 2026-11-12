@@ -6,10 +6,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${PLUGIN_ROOT}/scripts/post-tool-use.sh\" --harness codex"
-          },
-          {
-            "type": "command",
             "command": "bash \"${PLUGIN_ROOT}/scripts/post-tool-use-failure.sh\" --harness codex"
           }
         ]
@@ -32,15 +28,6 @@
           {
             "type": "command",
             "command": "bash \"${PLUGIN_ROOT}/scripts/pre-tool-use.sh\" --harness codex"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${PLUGIN_ROOT}/scripts/post-tool-use.sh\" --harness codex"
           }
         ]
       }

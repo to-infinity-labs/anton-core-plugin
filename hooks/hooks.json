@@ -1,11 +1,11 @@
 {
   "hooks": {
-    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh" }] }],
-    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-end.sh" }] }],
-    "PreCompact":       [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/prompt-submit.sh" }] }],
-    "PreToolUse":       [{ "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre-tool-use.sh" }] }],
-    "PostToolUse":      [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use.sh" }] }],
-    "PostToolUseFailure": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use-failure.sh" }] }]
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh --harness claude" }] }],
+    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-end.sh --harness claude" }] }],
+    "PreCompact":       [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh --harness claude" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/prompt-submit.sh --harness claude" }] }],
+    "PreToolUse":       [{ "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre-tool-use.sh --harness claude" }] }],
+    "PostToolUse":      [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use.sh --harness claude" }] }],
+    "PostToolUseFailure": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use-failure.sh --harness claude" }] }]
   }
 }

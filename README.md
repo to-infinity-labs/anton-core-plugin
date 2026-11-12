@@ -1,7 +1,7 @@
 # anton-core
 
 A personal AI assistant for Claude Code and Codex that remembers what matters, understands
-your codebase, and keeps your tasks and days in order — entirely on your own machine.
+your codebase, and keeps your tasks and days in order, with its memory kept on your own machine.
 
 ## What it does
 
@@ -22,12 +22,17 @@ both: they share the same memory, whichever you install first.
 - **Shows you everything** — a local browser dashboard for your memory, tasks, and
   code, plus health and session stats on demand.
 
-No account. No cloud. No login. Everything stays on your machine.
+No account and no login. Your memory lives in files on your machine; the few things
+that do go over the network are listed under [What leaves your machine](#what-leaves-your-machine),
+each with its off switch.
 
 ## Requirements
 
 - **Claude Code** or the **Codex CLI** (or both) — anton-core runs inside each as a plugin.
-- **macOS or Linux**, on Intel (`amd64`) or Apple/ARM (`arm64`). Windows is not supported.
+- **macOS, or Linux with glibc** (Debian, Ubuntu, Fedora and the like), on Intel (`amd64`)
+  or Apple/ARM (`arm64`). musl-based Linux such as Alpine, and Windows, are not supported.
+- **`bash`, `git` and `curl`** on your `PATH`. Setup checks for all three first and names
+  any that are missing.
 
 The correct binary for your platform is fetched and verified automatically the first
 time you run setup — there's nothing to download by hand.
@@ -111,6 +116,7 @@ From there:
 | --- | --- |
 | Save a fact, decision, or preference | `/anton-core:save` |
 | Find anything you've saved | `/anton-core:recall` |
+| Correct something you saved | `/anton-core:update` |
 | Pull action items out of notes or a transcript | `/anton-core:extract` |
 | Add a task or reminder | `/anton-core:tasks` |
 | Get a daily or weekly briefing | `/anton-core:summary` |
@@ -130,10 +136,33 @@ From there:
   `codex exec`, run that command after updating; until then Codex skips the
   hooks, and `$anton-core:health` says so.
 
-## Private by design — and verifiable
+## What leaves your machine
 
-anton-core keeps everything local. Your memory, tasks, and indexed code stay in files
-under `~/.anton-core` on your machine — kept even if you uninstall, unless you ask setup to erase them — — there's no server to send them to and no account to create.
+Your memory, tasks, and indexed code stay in files under `~/.anton-core` — kept even if
+you uninstall, unless you ask setup to erase them. There is no anton-core server, and no
+telemetry is sent anywhere. These are the network calls it does make, and how to turn
+each off (a config key is set with `anton config set --key <key> --value false`):
+
+- **The embedding model**, fetched once from huggingface.co, and **the llama.cpp
+  executable** that runs it, fetched once from llama.cpp's GitHub releases. Both run
+  locally afterwards; your text is embedded on your machine. Off: `embedder.enabled`,
+  which leaves search on words and links alone.
+- **The anton-core binary**, from this project's releases on github.com, at setup and
+  when a plugin update ships a newer engine. Nothing checks for updates in between. Off:
+  don't update the plugin — in Claude Code, leave auto-update off for this marketplace
+  in `/plugin`; in Codex, skip `codex plugin` updates.
+- **Session transcripts and saved memories, sent to the model through your own `claude`
+  or `codex` CLI**, on your existing account and its terms: summarising a session,
+  extracting its action items and decisions, deep analysis, and judging which memories
+  are related. Off: `headless.enabled`, which stubs these passes out. Each pass stops at
+  a dollar cap:
+  - `summarize.max_budget_usd` (default $1.00) per session summary
+  - `session_intelligence.deep_analysis_max_budget_usd` (default $2.00) per deep analysis
+  - `link.max_budget_usd` (default $5.00) per linking pass
+  - `dream.max_budget_usd` (default $5.0) per theme pass
+  - `vision.max_budget_usd` (default $0.25) per scanned PDF read
+
+## Verifying a release
 
 The binary ships as a signed release artifact, and setup verifies it before it ever runs:
 
@@ -150,6 +179,14 @@ bundle per binary. To check a download by hand (macOS shown; use `sha256sum` on 
 shasum -a 256 anton-core-v<version>-darwin-arm64
 grep darwin-arm64 checksums.txt        # the two hashes should match
 ```
+
+## Support
+
+Questions, bugs and feature requests go to
+[GitHub Issues](https://github.com/to-infinity-labs/anton-core-plugin/issues). Report a
+security vulnerability privately instead, through
+[GitHub private vulnerability reporting](https://github.com/to-infinity-labs/anton-core-plugin/security/advisories/new);
+`SECURITY.md` in the plugin says more.
 
 ## License
 

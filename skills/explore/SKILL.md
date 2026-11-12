@@ -1,34 +1,36 @@
 ---
 name: explore
-description: Walks the relationship graph outward from one seed to every connected node. Use for mapping what surrounds a recall hit before acting, and gestures like 'what is related to X' or 'explore around X'. Pairs with `expand` to deepen a batch.
+description: Walks the relationship graph around one saved memory by id — everything linked to it and how. Use for 'what is connected to item ref-…', 'walk its neighbourhood' or 'what is related to this note'. Pairs with `expand`.
 allowed-tools: Bash
 ---
 
 ## What it does
 
-Walks the relationship graph outward from one seed item and returns every node and edge reachable within a depth limit. Read-side companion to `expand`: `expand` deepens one batch of ids; `explore` widens around a single id. The walk is undirected by default and respects an optional relationship-type filter, so the skill can be pointed at structural code edges (`CALLS`, `EXTENDS`) or memory edges (`relates_to`, `supersedes`, `part_of`, `resolves`). The filter matches the stored type exactly, so pass it in that case. Bumps the seed's `access_count` and writes one row to `events.access_log` per invocation — the memory-side write that the read-only `graph query` surface cannot fire.
+Walks the memory relationship graph outward from one seed item and returns every node and edge within a depth limit. It covers memory items only — notes, decisions, documents, tasks — and their edges (`relates_to`, `supersedes`, `part_of`, `resolves`, and the pipeline's own); code symbols live in each repo's graph store, which `callers`, `callees` and `impact` walk. The walk is undirected by default.
 
 ## When to use
 
-- "explore around <id>", "what's related to <id>"
-- "show the neighborhood of <id>", "trace the graph from <id>"
+- "what is connected to <id>", "what's related to <id>", "explore around <id>"
+- "show the neighborhood of <id>", "walk its neighbourhood"
 - After `recall` returns an id worth widening around
 
 ## How
+
+Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
 
 ```
 anton memory explore --seed-id <id> [--depth N] [--rel-types T1,T2] [--direction {out,in,both}] [--include-content] [--include-suppressed]
 anton graph level --view <slug> [--parent d:<dir>]
 ```
 
-For a directory's size and coupling map rather than one item's neighborhood, read a level of the repo's view: each child directory or file with its item count and internal edges, the links between children, and the links leaving the directory. `anton graph views` lists the views.
-
-The default walk hides edges an operator suppressed with `unrelate`; `--include-suppressed` shows them, each marked `suppressed: true`.
+`--depth` defaults to 2 and is clamped to `tools.explore_depth_ceiling` (default 8). `--rel-types` matches the stored type exactly. Edges the operator suppressed with `unrelate` stay hidden unless `--include-suppressed`. For a directory's size and coupling map rather than one item's neighborhood, read a level of the repo's view with `graph level`; `anton graph views` lists the views.
 
 ## Output
 
-Success envelope is a JSON object with `nodes` and `edges` arrays plus the `requested_depth` / `applied_depth` / `seed_bumped` echo fields. Each node carries `id`, `type`, `title`, `summary`, `kind`, `complexity`, and `hop_distance` (and `content` when `--include-content` was passed); each edge carries `source`, `target`, `rel_type`, and `weight`. Only the seed's `access_count` is bumped — walk traversal is not a touch. `memory explore` returns `{"status":"ok","nodes":[{"id":"...","type":"...","title":"...","hop_distance":N}],"edges":[{"source":"...","target":"...","rel_type":"..."}],"requested_depth":N,"applied_depth":N,"seed_bumped":true}`. Contract: `memory-explore` in the anton-core CLI contract. `graph level` returns `{"status":"ok","source":"canonical","breadcrumb":[{"id":"r:","label":"..."},{"id":"d:...","label":"..."}],"nodes":[{"id":"f:...","label":"...","node_kind":"file","descendants":N,"children":N,"internal_edges":N,"expandable":true}],"links":[{"source":"...","target":"...","weight":N}],"boundary_links":[{"source":"...","target":"...","weight":N}],"wells":[],"clusters":[],"totals":{"descendants":N,"edges":N},"warnings":[]}`. Contract: `graph-level`.
+`nodes` (each with its `hop_distance` from the seed) and `edges`; at most 500 nodes, and `truncated: true` means the walk stopped there, so narrow it. Only the seed's access count rises; walked nodes are not touched. A seed id that names no memory item is `entity_not_found`.
+
+Contract: `memory-explore`, `graph-level` in the anton-core CLI contract.
 
 ## See also
 
-- [`expand`](../expand/SKILL.md) — deepens one batch of ids into full bodies; `explore` widens around a single id into its neighborhood.
+- [`expand`](../expand/SKILL.md) — deepens one batch of ids into full bodies.

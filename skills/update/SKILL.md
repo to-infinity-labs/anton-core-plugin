@@ -19,10 +19,12 @@ Rewrites fields of one existing memory item, keeping its id and its edges. Chang
 Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
 
 ```
-anton item update --id <id> [--title <title>] [--summary <summary>] [--content <text>] [--tag <name> ...]
+anton item update --id <id> [--title <title>] [--summary <summary>] [--content <text>] [--tag <name> ...] [--provenance <kind>] [--evidence <text>]
 ```
 
 Without an id, find it first with `anton memory recall --query <subject>`. Pass at least one field. `--tag` replaces the whole tag set: to add a tag, read the current tags with `anton item get --ids <id>` and pass every one you keep plus the new one.
+
+When you have checked the note against ground truth, record how with `--provenance` (`ran`, `read`, `operator`, `extracted`, `inferred`) and `--evidence`, as [save](../save/SKILL.md) does; `--evidence` alone updates it under the stored kind, and is refused on a note that has none yet. A new `--provenance` without `--evidence` drops the old evidence, so pass both when the kind changes. Any edit but a retag clears a stale flag the validate pass set, since the edit is a new claim.
 
 ## Output
 

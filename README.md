@@ -153,13 +153,14 @@ each off (a config key is set with `anton config set --key <key> --value false`)
   in `/plugin`; in Codex, skip `codex plugin` updates.
 - **Session transcripts and saved memories, sent to the model through your own `claude`
   or `codex` CLI**, on your existing account and its terms: summarising a session,
-  extracting its action items and decisions, deep analysis, and judging which memories
-  are related. Off: `headless.enabled`, which stubs these passes out. Each pass stops at
+  extracting its action items and decisions, deep analysis, judging which memories
+  are related, and checking often-recalled memories against your repos. Off: `headless.enabled`, which stubs these passes out. Each pass stops at
   a dollar cap:
   - `summarize.max_budget_usd` (default $1.00) per session summary
   - `session_intelligence.deep_analysis_max_budget_usd` (default $2.00) per deep analysis
   - `link.max_budget_usd` (default $5.00) per linking pass
-  - `dream.max_budget_usd` (default $5.0) per theme pass
+  - `dream.max_budget_usd` (default $5.00) per theme pass
+  - `validate.max_budget_usd` (default $1.00) per validation pass
   - `vision.max_budget_usd` (default $0.25) per scanned PDF read
 
 ## Verifying a release

@@ -1,6 +1,6 @@
 {
   "name": "anton-core",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "description": "Personal AI assistant — knowledge, tasks, code graph, session intelligence",
   "author": { "name": "to-infinity-labs", "url": "https://github.com/to-infinity-labs/anton-core-plugin" }
 }

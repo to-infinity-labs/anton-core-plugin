@@ -24,7 +24,7 @@ anton item extract [--source-path <file>] [--operator <name>] [--tasks-only]
 
 Pasted content goes on stdin (`printf '%s' "<text>" | anton item extract`); a file goes in `--source-path`. `--operator` overrides the configured owner; `--tasks-only` returns the action items alone.
 
-Meeting tasks are owner-only: create a task (the [tasks](../tasks/SKILL.md) skill) only for an action item marked `createTask: true`, which is the operator's own. Never create one for another attendee's item; list those for the operator instead. Decisions worth keeping go through [save](../save/SKILL.md).
+Meeting tasks are owner-only: create a task (the [tasks](../tasks/SKILL.md) skill) only for an action item marked `createTask: true`, which is the operator's own. Never create one for another attendee's item; list those for the operator instead. Decisions worth keeping go through [save](../save/SKILL.md), with `--provenance extracted` and the document as `--evidence`.
 
 ## Output
 

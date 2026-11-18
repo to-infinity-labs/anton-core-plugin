@@ -8,6 +8,8 @@ allowed-tools: Bash
 
 The one way content enters memory. Pasted text, a file or a pre-parsed batch goes through intake, is deduplicated against what is already stored, and is written with its relationships.
 
+A memory is a bet that something will matter again: what a later session could not recover from the repo, a transcript or the operator. Don't store what the environment already shows.
+
 ## When to use
 
 - "remember that we decided X", "remember this", "save this", "store this", "add to kb"
@@ -19,14 +21,16 @@ The one way content enters memory. Pasted text, a file or a pre-parsed batch goe
 Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
 
 ```
-anton item save --type <type> --title <title> --content <text> [--summary S] [--importance F] [--relate <type>:<target-id> ...] [--tag <name> ...]
+anton item save --type <type> --title <title> --content <text> [--provenance <kind>] [--evidence <text>] [--summary S] [--importance F] [--relate <type>:<target-id> ...] [--tag <name> ...]
 anton item save --source-path <file> [--tag <name> ...]
 anton item save --items-json <array> | --items-file <file> [--tag <name> ...]
 ```
 
 For a typed note, the first form. `--type` is one of `document`, `reference`, `project`, `feedback`, `note`, `fact`, `decision`, `question`; anything else is stored as `note` with the original kept on a `raw_type:` tag. `--importance` is `[0.0, 1.0]`, default 1. `--tag` takes one tag per occurrence. `--relate supersedes:<old-id>` links the new item over an existing one in the same write (first form only).
 
-`--source-path` runs the full intake pipeline over a file. A batch is a JSON array of `{type, title, content}` objects with optional `summary`, `tags`, `key` and `relations` (`[{"type":"supersedes","target":"<id or @key>"}]`); any other field rejects it, and the whole batch is validated and written in one transaction.
+Always say how the note is known. `--provenance` is `ran` (a command or test showed it), `read` (a file read; `--evidence` names `path[:line]`, required), `operator` (the operator said it), `extracted` (taken from a document) or `inferred` (your own conclusion). `--evidence` says what showed it: the command, the path, the quote. Recall ranks checked notes above inferred ones, so never claim `ran` or `read` for something you did not run or read.
+
+`--source-path` runs the full intake pipeline over a file. `--source-path` labels each item itself, so `--provenance` is refused there. A batch is a JSON array of `{type, title, content}` objects with optional `summary`, `tags`, `key`, `relations`, `provenance` and `evidence` (`[{"type":"supersedes","target":"<id or @key>"}]`); any other field rejects it, and the whole batch is validated and written in one transaction.
 
 ## Output
 

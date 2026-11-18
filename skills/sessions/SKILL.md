@@ -28,7 +28,7 @@ By default run `session stats --days 30` and `session list --limit 10` together;
 
 ## Output
 
-`session stats` gives the session count, average duration and messages, flagged sessions, the top tools and `token_total` — main-transcript tokens only; subagent spend is in the [usage](../usage/SKILL.md) ledger. A list row carries `has_flags: 1` only when the session raised flags.
+`session stats` gives the session count, average duration and messages, flagged sessions, the top tools, `improvements` (pending), `improvement_regressions` (approved improvements whose flag rate rose; review them with the [improvements](../improvements/SKILL.md) skill) and `token_total` — main-transcript tokens only; subagent spend is in the [usage](../usage/SKILL.md) ledger. A list row carries `has_flags: 1` only when the session raised flags.
 
 Contract: `session-stats`, `session-list`, `session-get`, `improvement-list` in the anton-core CLI contract.
 

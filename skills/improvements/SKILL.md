@@ -18,7 +18,7 @@ The review queue for deep analysis's suggestions. Approving records a suggestion
 Run the command that fits with Bash, then answer from what it prints. Never answer before it has run: what the store holds is unknown until it does.
 
 ```
-anton improvement list [--pending-only | --applied-only] [--limit N] [--since <epoch-ms|ISO-8601>]
+anton improvement list [--pending-only | --applied-only | --regressed] [--limit N] [--since <epoch-ms|ISO-8601>]
 anton improvement approve --id <id>
 anton improvement dismiss --id <id>
 ```
@@ -27,7 +27,7 @@ A bare `improvement list` returns both pending and applied rows; pass `--pending
 
 ## Output
 
-`improvements`, newest first, each with its `item_id` (`impr-<16 hex>`), `category`, `target` and `state`. Report the remaining pending count after each approve or dismiss. An unknown id is `entity_not_found`.
+`improvements`, newest first, each with its `item_id` (`impr-<16 hex>`), `category`, `target` and `state`. An approved row carries `decided_at` and an `effect`: the flag rate of sessions on its flag types for `window_days` before the approval against after, with a `verdict` of `improved`, `flat`, `regressed`, `insufficient` (too few sessions yet) or `undated`. Report a regression plainly, and say once that the measure is a correlation: it splits at the approval, spans every project, and backfilled sessions use today's thresholds. `--regressed` lists only the regressed ones. Report the remaining pending count after each approve or dismiss. An unknown id is `entity_not_found`.
 
 Contract: `improvement-list`, `improvement-approve`, `improvement-dismiss` in the anton-core CLI contract.
 

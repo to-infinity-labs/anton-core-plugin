@@ -5,6 +5,52 @@ This file is the source of the notes published on each GitHub release.
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-11-18
+
+### Added
+
+- **Memory records how it was known.** An item can carry a provenance (`ran`, `read`, `operator`, `extracted` or `inferred`) and short evidence, such as the file and line it was read from: `item save` and `item update` take `--provenance` and `--evidence`, a batch item takes the same fields, `task add` records `operator`, and extraction labels each item `extracted` or `inferred`. Recall ranks what was run, read or said by you above what was inferred, and shows the kind on every hit (ACG-53).
+- **Consolidation checks memory against what happened.** A third daily pass, `validate`, re-checks open tasks, often-recalled notes and notes with checkable claims (file and symbol references, merged PRs, released versions) against the repo, the code graph and recent session summaries. A wrong fact is superseded by a corrected one; a task, or a fact someone ran, read or heard from you, is only flagged `stale`, and recall demotes it. It runs under the existing cooldown and rate-limit brakes and stops at $1.00 a run. `maintenance status` reports its last run, spend and verdict counts, and `maintenance reset --target validation-unknown` re-opens the items it could not decide (ACG-53).
+- **Approved improvements are measured.** `improvement list` shows when each was decided and, for an approved one, the flag rate of the sessions before and after it: `improved`, `flat`, `regressed` or `insufficient`. `--regressed` lists the ones that made things worse, and `session stats` counts them (ACG-53).
+
+### Changed
+
+- **The instructions Anton Core adds to your CLAUDE.md are a short index.** The routing table, data layout and conventions sections are gone (skills carry their own triggers); what is left says what memory is for. Fragment 3.0.0 applies on the next session start (ACG-53).
+- **Extraction quotes exact figures verbatim.** Numbers, amounts, dates, ids, versions and contract terms are quoted character for character, one item per entity, never paraphrased into a shared table (ACG-53).
+- The dashboard shows an item's provenance and validation, a `stale` badge on flagged notes and tasks, and each approved improvement's effect (ACG-53).
+- **The dashboard's filter bars are one toolbar that applies live.** Memory's search leads, then tag tokens (Enter, comma or Tab makes one; Backspace selects, then removes), then one labelled Created range; results and the URL change in place, with no Filter button, and Back steps through the filters. Types are one connected segmented control: All clears the others, every other type toggles, the counts stay. Graph search scopes by repo with a removable token, Cycles searches live, Paths reads From → To with Find paths, and Tasks' groups are a single-select segmented control. With scripting off each bar is still a GET form (ACG-54).
+
+### Fixed
+
+- **Recall-on-error injects mined fixes again.** Since mined fixes were stamped `inferred`, their weight pulled a genuine fix below `recall_on_error.min_score`, so the hook stayed silent and logged `suppressed_below_threshold`. The threshold now compares the score before the provenance and stale weights, the scale it was calibrated on; `recall-on-error doctor` reports that score as `relevance_score` beside `final_score`, and the ledger records it. The doctor's text line says `would not inject` for a fix below the threshold instead of `would inject`, and a `--format` other than `json` or `text` is `invalid_argument` rather than JSON (ACG-62).
+- **`repos add` refuses a path that is not an existing directory, before anything is written.** A missing path, dangling symlink or path under a file exits 3 `entity_not_found`; a non-directory exits 1 `invalid_argument`; a path that cannot be checked or listed exits 5 `io_error`; `--type` other than `repo` or `parent` exits 1. This holds under `--no-sync` and `--type parent`, and `--discover --base-dir` gets the same check. Hand-editing `repos.json` stays supported (ACG-50).
+- **A folder that cannot be read no longer empties its index.** `repos sync`, `graph index`, `graph catchup` and the watcher read a gone, unlistable or emptied folder as every file deleted, wiped the store and stamped it fresh; they now keep the store, report one failure naming the folder, and re-sync when it returns. That holds when the store itself cannot be read, and for a nested checkout or subfolder indexed into an enclosing repo's store, which no longer loses the outer repo's files (ACG-50).
+- **An absent parent no longer stops every other repo.** `repos sync` syncs the rest with a `skipped` row for the parent; `watch status` and the fragmentation check read it as no children; `maintenance prune` skips its registry sweep with a warning (ACG-50).
+- **`repos add --type parent` indexes the children**, returned in `sources`, with each child's problems in `warnings` under its slug; it used to index nothing. Adding a disabled entry says it was not synced. A registered path's stored type decides, and a differing `--type` is named in `warnings`. Adding a parent over a registered child no longer breaks every later sync (ACG-50).
+- **`repos add --discover` writes nothing**, as the contract says; it used to mint registry rows, and now previews distinct slugs for candidates that normalize alike (ACG-50).
+- **A malformed `repos.json` or unknown `type` is a typed `io_error` naming the file** rather than an untyped `internal` (ACG-50).
+- **`repos remove` on a malformed `repos.json` deletes nothing.** It used to delete the registry row and the store, then fail on the file (ACG-50).
+- **A second spelling of a registered folder is the same entry to `repos add`.** It used to append a duplicate that every later load refused (ACG-50).
+- **A repo under a symlinked folder keeps its one slug while away**, so `repos sync --source` still finds it and `repos doctor` stays clean when it returns (ACG-50).
+- **`repos doctor` reports an unreadable `repos.json` as `repos_file_unreadable`** instead of advising `repos remove` for every registered repo (ACG-50).
+- **`repos remove` and `repos doctor` compare paths through symlinks.** An entry reached through one is removed instead of kept with exit 0, and a healthy one no longer reports two false mismatches; a healthy parent stops reporting false mismatches too. `repos doctor` gains `file_entry_path_unavailable` (ACG-50).
+- `session reflect` emits its `flags` and `flag_trace` entries with the lowercase keys its contract names (`type`, `detail`, `reason`, …) instead of `Type`, `Detail` (ACG-53).
+- Extraction now asks the model for an action item's due date, which it already read but never requested (ACG-53).
+- `maintenance status` now includes the last run's recall-sentinel reap result, which it read but dropped (ACG-53).
+- **The dashboard's filter controls stacked one per line.** templUI's input wraps itself in a full-width box, so in a wrapping row every field claimed a line; fields now own their width, and the row wraps by field only when the content is narrow. Tasks' Due dates no longer wrap onto two lines, and every count line agrees in number with what it shows: "1 result", "1 session", "1 of 3 items" (ACG-54).
+- **`TwMerge` resolves border width, ring width and background colour**, so a component's `border-0`, `ring-0` or `bg-transparent` replaces templUI's default instead of rendering both (ACG-54).
+- A session that ends without a transcript on disk no longer starts a finalize
+  that can only fail. SessionEnd writes no marker for it and reports
+  `finalize_dispatched: skipped:no-transcript`, `session finalize` clears such
+  a marker without running a stage or writing `FINALIZE_STAGE_FAILED`
+  (`skipped: "no-transcript"`), and the `finalize-backlog` health check no
+  longer counts it, so a stream of transcript-less background sessions stops
+  flipping the check to a warning.
+- The SessionStart sweep now clears a marker only when its transcript is
+  absent; a transcript it cannot check for another reason is retried, then
+  parked. It also removes files left by an interrupted marker write once they
+  are a day old.
+
 ## [5.0.1] - 2026-11-12
 
 5.0.1 upgrades from 4.0.0 or later only. A store from 3.x or earlier is
@@ -1172,7 +1218,8 @@ update and keeps its binary.
   session start-up message names the command that will actually clear a held
   update rather than one that cannot.
 
-[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v5.0.1...HEAD
+[Unreleased]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v5.1.0...HEAD
+[5.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v5.0.1...v5.1.0
 [5.0.1]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.2...v5.0.1
 [4.1.2]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.1.0...v4.1.2
 [4.1.0]: https://github.com/to-infinity-labs/anton-core-plugin/compare/v4.0.0...v4.1.0
